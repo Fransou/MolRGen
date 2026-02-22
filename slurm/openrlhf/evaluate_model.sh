@@ -14,9 +14,9 @@
 DATASET=$1
 CONFIG=$2
 
-DATA_PATH=$SLURM_TMPDIR/$DATASET
 WORKING_DIR=$HOME/MolGenDocking
 export DASHBOARD_PORT=$((8001 + SLURM_ARRAY_TASK_ID))
+export DATA_PATH=$SLURM_TMPDIR/$DATASET
 
 source $HOME/.bashrc
 source $HOME/OpenRLHF/bin/activate
@@ -42,6 +42,7 @@ ray job submit \
 
 export docking_oracle=autodock_gpu
 export scorer_exhaustiveness=4
+
 if [ "$DATASET" == "molgendata" ]; then
     python -m mol_gen_docking.score_completions \
       --iter $SLURM_ARRAY_TASK_ID \
