@@ -48,6 +48,7 @@ nav:
         - Top-k Metric: api/evaluation/top_k.md
         - Diversity-Aware Top-k: api/evaluation/diversity_aware_top_k.md
         - Fingerprint Utilities: api/evaluation/fingeprints_utils.md
+        - SFT Dataset Creation: api/evaluation/sft_data_creation.md
       - Reward:
         - Molecular Verifier: api/reward/molecular_verifier.md
         - Generation Verifier: api/reward/generation_verifier.md

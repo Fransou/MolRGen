@@ -1,0 +1,21 @@
+# Configuration for MolGenData batch inference
+### MODEL SPECIFIC CONFIGURATION
+pretrain: /scratch/fransou/Qwen/Qwen3-30B-A3B-Thinking-2507
+max_new_tokens: 32768
+top_p: 0.95
+temperature: 0.6
+output_path: /scratch/fransou/MolGenOutput/molgendata/Qwen3-30B-A3B-Thinking-2507/out_{iter}
+### DATASET SPECIFIC CONFIGURATION
+best_of_n: 128
+rollout_batch_size: 100
+### COMMON CONFIGURATION
+dataset: /scratch/fransou/MolGenData/molgendata/test_data/test_prompts_ood_boxed.jsonl
+eval_task: generate_vllm
+max_len: 4096
+zero_stage: 3
+bf16: true
+apply_chat_template: true
+input_key: messages
+label_key: meta
+system_prompt: system_prompts/vanilla.json
+tp_size: 4

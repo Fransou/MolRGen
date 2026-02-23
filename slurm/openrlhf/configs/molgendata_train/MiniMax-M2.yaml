@@ -1,15 +1,15 @@
 # Configuration for MolGenData batch inference
 ### MODEL SPECIFIC CONFIGURATION
-pretrain: /scratch/fransou/Qwen/Qwen3-Next-80B-A3B-Thinking
-max_new_tokens: 16384
+pretrain: /scratch/fransou/MiniMaxAI/MiniMax-M2
+max_new_tokens: 32768
 top_p: 0.95
-temperature: 0.6
-output_path: /scratch/fransou/MolGenOutput/property_prediction/Qwen3Next_thinking/out_{iter}
+temperature: 1.0
+output_path: /scratch/fransou/MolGenOutput/molgendata_train/MiniMax-M2/out_{iter}
 ### DATASET SPECIFIC CONFIGURATION
-best_of_n: 5
-rollout_batch_size: 5000
+best_of_n: 16
+rollout_batch_size: 100
 ### COMMON CONFIGURATION
-dataset: /scratch/fransou/MolGenData/property_prediction/eval_prompts_boxed.jsonl
+dataset: /scratch/fransou/MolGenData/molgendata/train_data/train_prompts_boxed.jsonl
 eval_task: generate_vllm
 max_len: 4096
 zero_stage: 3

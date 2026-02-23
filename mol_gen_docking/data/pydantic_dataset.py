@@ -109,7 +109,7 @@ class Conversation(BaseModel):
     identifier: str = Field(..., description="Unique conversation identifier")
     references: List[Any] = Field(
         default_factory=list,
-        description="Reference data for evaluation and ground truth",
+        description="Reference data for evaluation and ground truth (LEGACY, contained in the metadata)",
     )
     rating: Optional[float] = Field(
         None, description="Quality rating (typically 0.0-1.0 scale)"

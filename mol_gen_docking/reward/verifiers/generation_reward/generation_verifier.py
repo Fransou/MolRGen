@@ -183,7 +183,9 @@ class GenerationVerifier(Verifier):
                     results.append(False)
             return results
 
-        s_poss = [filter_smiles(x) for x in re.split("\n| |\\.|\t|:|`|'|,", comp)]
+        s_poss = [
+            filter_smiles(x) for x in re.split("\n| |\\.|\t|:|`|'|,|\\{|\\}", comp)
+        ]
         s_poss = [x for x in s_poss if x != ""]
         s_poss = list(set(s_poss))
 

@@ -6,7 +6,7 @@ It ensures selected molecules are sufficiently different from each other, preven
 the selection of similar redundant compounds.
 """
 
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 from rdkit import Chem
@@ -88,81 +88,94 @@ def diversity_aware_top_k(
     k: int,
     t: float,
     fingerprint_name: Optional[str] = "ecfp4-1024",
-) -> float:
+    return_idxs: bool = False,
+) -> float | Tuple[float, List[int]]:
     """Calculate diversity-aware top-k metric for molecular generation.
 
-    This function computes a diversity-aware top-k metric that selects up to k molecules
-    with the highest scores, subject to the constraint that selected molecules must
-    have chemical similarity below a threshold (i.e., dissimilarity above 1-t).
-    This prevents selecting multiple similar molecules and encourages chemical diversity.
+        This function computes a diversity-aware top-k metric that selects up to k molecules
+        with the highest scores, subject to the constraint that selected molecules must
+        have chemical similarity below a threshold (i.e., dissimilarity above 1-t).
+        This prevents selecting multiple similar molecules and encourages chemical diversity.
 
-    Args:
-        mols: List of molecules in one of three formats:
-            - List of SMILES strings (str)
-            - List of RDKit Mol objects (Chem.Mol)
-            - 2D NumPy array representing a similarity matrix
-        scores: Sequence of scores corresponding to each molecule (e.g., docking scores).
-            Must have the same length as mols (unless mols is a similarity matrix).
-        k: Maximum number of molecules to select.
-        t: Similarity threshold (range 0.0 to 1.0). Selected molecules must have
-            Tanimoto similarity < t to be considered diverse enough.
-            Lower values enforce higher diversity.
-        fingerprint_name: Name of the molecular fingerprint to use for similarity calculation.
-            Only used when mols are SMILES or Mol objects. Default is "ecfp4-1024".
-            See mol_gen_docking.evaluation.fingeprints_utils.fp_name_to_fn for options.
+        Args:
+            mols: List of molecules in one of three formats:
+                - List of SMILES strings (str)
+                - List of RDKit Mol objects (Chem.Mol)
+                - 2D NumPy array representing a similarity matrix
+            scores: Sequence of scores corresponding to each molecule (e.g., docking scores).
+                Must have the same length as mols (unless mols is a similarity matrix).
+            k: Maximum number of molecules to select.
+            t: Similarity threshold (range 0.0 to 1.0). Selected molecules must have
+                Tanimoto similarity < t to be considered diverse enough.
+                Lower values enforce higher diversity.
+            fingerprint_name: Name of the molecular fingerprint to use for similarity calculation.
+                Only used when mols are SMILES or Mol objects. Default is "ecfp4-1024".
+                See mol_gen_docking.evaluation.fingeprints_utils.fp_name_to_fn for options.
+    return_idxs            If False (default), return only the average score.
 
-    Returns:
-        Average score of the selected k diverse molecules. If fewer than k molecules
-        are selected due to diversity constraints, unselected slots are padded with 0.0.
+        Returns:
+            If return_idxs is False (default):
+                Average score of the selected k diverse molecules. If fewer than k molecules
+                are selected due to diversity constraints, unselected slots are padded with 0.0.
+            If return_idxs is True:
+                Tuple of (average_score, indices) where:
+                    - average_score: Average score of selected molecules (with 0.0 padding)
+                    - indices: List of indices of selected molecules from the input
 
-    Raises:
-        AssertionError: If mols and scores have different lengths, or if input types
-            are inconsistent.
+        Raises:
+            AssertionError: If mols and scores have different lengths, or if input types
+                are inconsistent.
 
-    Example:
-        ```python
-        from mol_gen_docking.evaluation.diversity_aware_top_k import diversity_aware_top_k
-        from rdkit import Chem
+        Example:
+            ```python
+            from mol_gen_docking.evaluation.diversity_aware_top_k import diversity_aware_top_k
+            from rdkit import Chem
 
-        # Using SMILES strings
-        smiles = [
-            "c1ccccc1",                              # benzene
-            "CC(C)Cc1ccc(cc1)C(C)C(O)=O",           # ibuprofen
-            "c1ccc2ccccc2c1",                       # naphthalene (similar to benzene)
-            "CCO"                                    # ethanol
-        ]
-        scores = [8.5, 9.2, 8.0, 6.5]
+            # Using SMILES strings
+            smiles = [
+                "c1ccccc1",                              # benzene
+                "CC(C)Cc1ccc(cc1)C(C)C(O)=O",           # ibuprofen
+                "c1ccc2ccccc2c1",                       # naphthalene (similar to benzene)
+                "CCO"                                    # ethanol
+            ]
+            scores = [8.5, 9.2, 8.0, 6.5]
 
-        # Select top 2 molecules with similarity threshold 0.8
-        metric = diversity_aware_top_k(
-            smiles, scores, k=2, t=0.8, fingerprint_name="ecfp4-1024"
-        )
-        print(f"Diversity-aware top-2 score: {metric}")
+            # Select top 2 molecules with similarity threshold 0.8
+            metric = diversity_aware_top_k(
+                smiles, scores, k=2, t=0.8, fingerprint_name="ecfp4-1024"
+            )
+            print(f"Diversity-aware top-2 score: {metric}")
 
-        # Using a pre-computed similarity matrix
-        sim_matrix = np.array([
-            [1.0, 0.3, 0.9, 0.2],
-            [0.3, 1.0, 0.4, 0.6],
-            [0.9, 0.4, 1.0, 0.3],
-            [0.2, 0.6, 0.3, 1.0]
-        ])
-        metric = diversity_aware_top_k(
-            sim_matrix, scores, k=2, t=0.8
-        )
-        ```
+            # Get both score and indices
+            metric, indices = diversity_aware_top_k(
+                smiles, scores, k=2, t=0.8, fingerprint_name="ecfp4-1024", return_idxs=True
+            )
+            print(f"Score: {metric}, Selected indices: {indices}")
 
-    Notes:
-        - The function converts similarity matrices to distance matrices (1 - similarity)
-        - Higher t values (closer to 1.0) allow selection of more similar molecules
-        - Lower t values enforce stricter diversity constraints
-        - If a similarity matrix is provided directly, it should be a 2D NumPy array
-          with diagonal elements equal to 1.0
-        - Padding with 0.0 for unselected slots means diversity constraints can
-          result in lower average scores than unconstrained top-k
+            # Using a pre-computed similarity matrix
+            sim_matrix = np.array([
+                [1.0, 0.3, 0.9, 0.2],
+                [0.3, 1.0, 0.4, 0.6],
+                [0.9, 0.4, 1.0, 0.3],
+                [0.2, 0.6, 0.3, 1.0]
+            ])
+            metric, idxs = diversity_aware_top_k(
+                sim_matrix, scores, k=2, t=0.8
+            )
+            ```
 
-    References:
-        This metric is commonly used in molecular generation benchmarks to evaluate
-        both quality and diversity of generated molecules (e.g., De Novo Generation task).
+        Notes:
+            - The function converts similarity matrices to distance matrices (1 - similarity)
+            - Higher t values (closer to 1.0) allow selection of more similar molecules
+            - Lower t values enforce stricter diversity constraints
+            - If a similarity matrix is provided directly, it should be a 2D NumPy array
+              with diagonal elements equal to 1.0
+            - Padding with 0.0 for unselected slots means diversity constraints can
+              result in lower average scores than unconstrained top-k
+
+        References:
+            This metric is commonly used in molecular generation benchmarks to evaluate
+            both quality and diversity of generated molecules (e.g., De Novo Generation task).
     """
     dist_mat: np.ndarray[float]
     assert len(mols) == len(scores), "Mols and scores must have the same length."
@@ -199,4 +212,7 @@ def diversity_aware_top_k(
         [scores[idx] for idx in idxs] + [0.0 for _ in range(len(idxs), k)]
     )
     out_val: float = np.mean(scores_arr)
-    return out_val
+    if not return_idxs:
+        return out_val
+    else:
+        return out_val, idxs.tolist()
