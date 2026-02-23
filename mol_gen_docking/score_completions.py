@@ -50,6 +50,8 @@ def get_args() -> argparse.Namespace:
         with open(args.input_file) as f:
             config = yaml.safe_load(f)
         args.input_file = config["output_path"]
+        if not args.input_file.endswith(".jsonl"):
+            args.input_file += ".jsonl"
         args.input_file = args.input_file.format(
             iter=args.iter if args.iter is not None else "final"
         )

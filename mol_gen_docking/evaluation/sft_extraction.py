@@ -1,9 +1,9 @@
 import json
+import re
 from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
-from tqdm.auto import tqdm
 
 from mol_gen_docking.data.pydantic_dataset import (
     Conversation,
@@ -84,6 +84,7 @@ class SFTExtractionConfig(BaseModel):
             The template should include placeholders for the content and source values. \
             This pattern is always applied after the reward_info_template if both are specified.",
     )
+    boxed: bool = Field(True, description="Whether to force the answer to be boxed")
 
 
 class SFTExtractionMetadata(BaseModel):
@@ -386,6 +387,39 @@ class SFTExtractor:
             # stop the completion after the last </answer> tag
             assistant_content = completion.output
             assistant_content = assistant_content.split("</answer>")[0] + "</answer>"
+            if self.config.boxed:
+                # If there is no \boxed{...} in the content, we add it around the answer
+                parsed_answer = re.search(
+                    r"<answer>(.*?)</answer>", assistant_content, re.DOTALL
+                )
+                if parsed_answer is not None:
+                    if not re.search(r"\\boxed{.*?}", parsed_answer.group(1)):
+                        # Get the extracted answer from the metadata
+                        if (
+                            completion.reward_meta.get("generation_verifier_metadata")
+                            is not None
+                        ):
+                            extracted_answer = completion.reward_meta[
+                                "generation_verifier_metadata"
+                            ]["all_smi"][0]
+                        elif (
+                            completion.reward_meta.get("mol_prop_verifier_metadata")
+                            is not None
+                        ):
+                            # For property prediction, we can try to extract the value from the metadata
+                            extracted_answer = completion.reward_meta[
+                                "mol_prop_verifier_metadata"
+                            ]["extracted_value"]
+                        else:
+                            raise NotImplementedError(
+                                "Boxing is only implemented for molecular generation and property prediction tasks."
+                            )
+                        new_parsed_answer = f"\\boxed{{{extracted_answer}}}"
+                        assistant_content = assistant_content.replace(
+                            f"<answer>{parsed_answer.group(1)}</answer>",
+                            f"<answer>{new_parsed_answer}</answer>",
+                        )
+
             assistant_message = Message(role="assistant", content=assistant_content)
             prompt_message = deepcopy(conversation.messages)
             prompt_message.append(assistant_message)
@@ -497,12 +531,12 @@ class SFTExtractor:
         completions = self.filter_is_correct(completions)
 
         id_to_completions: Dict[str, List[Completion]] = {}
-        for c in tqdm(completions, desc="Grouping completions by prompt_id"):
+        for c in completions:
             prompt_id = c.metadata["prompt_id"]
             if prompt_id not in id_to_completions:
                 id_to_completions[prompt_id] = []
             id_to_completions[prompt_id].append(c)
-        for prompt in tqdm(prompts, desc="Processing prompts and extracting samples"):
+        for prompt in prompts:
             # Add the system prompt template to the prompt conversations if specified in the config
             if self.config.system_prompt_path is not None:
                 with open(self.config.system_prompt_path) as f:

@@ -1,0 +1,21 @@
+# Configuration for SFT fine-tuning
+pretrain: /scratch/fransou/Qwen/Qwen3-4B
+save_hf_ckpt: true
+save_steps: 50
+max_ckpt_num: 10000
+micro_train_batch_size: 1
+train_batch_size: 128
+max_epochs: 3
+learning_rate: 0.00005
+lr_warmup_ratio: 0.05
+packing_samples: true
+input_key: messages
+
+#### MODEL SPECIFIC CONFIGURATION
+bf16: true
+flash_attn: true
+apply_chat_template: true
+max_len: 10240
+use_wandb: true
+ds_tensor_parallel_size: 4
+zero_stage: 2
