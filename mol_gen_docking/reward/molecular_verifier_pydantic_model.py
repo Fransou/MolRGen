@@ -31,6 +31,7 @@ class MolecularVerifierConfigModel(BaseModel):
 
             - "property": Computes property-based rewards (docking scores, molecular properties)
             - "valid_smiles": Computes validity rewards (1.0 for valid single SMILES, 0.0 otherwise)
+        pg_name: Optional name of the Ray placement group to schedule tasks on.
         generation_verifier_config: Configuration for de novo molecular generation tasks.
             Required if handling generation tasks. Contains settings for molecular property
             optimization, docking oracle configuration, and SMILES extraction.
@@ -103,6 +104,10 @@ class MolecularVerifierConfigModel(BaseModel):
         default="property",
         description="Type of reward to use for molecular verification.",
     )
+    pg_name: Optional[str] = Field(
+        default=None,
+        description="Optional name of the Ray placement group to schedule tasks on.",
+    )
     generation_verifier_config: Optional[GenerationVerifierConfigModel] = Field(
         None,
         description="Configuration for generation verifier, required if reward is 'valid_smiles'.",
@@ -122,9 +127,11 @@ class MolecularVerifierConfigModel(BaseModel):
         if self.generation_verifier_config is not None:
             self.generation_verifier_config.reward = self.reward
             self.generation_verifier_config.parsing_method = self.parsing_method
+            self.generation_verifier_config.pg_name = self.pg_name
         if self.mol_prop_verifier_config is not None:
             self.mol_prop_verifier_config.parsing_method = self.parsing_method
             self.mol_prop_verifier_config.reward = self.reward
+            self.mol_prop_verifier_config.pg_name = self.pg_name
         if self.reaction_verifier_config is not None:
             ### FOR REACTION VERIFIER, SPECIAL BEHAVIOR:
             ###     - if parsing_method is "none", set it to "none" for reaction verifier
@@ -134,6 +141,7 @@ class MolecularVerifierConfigModel(BaseModel):
             else:
                 self.reaction_verifier_config.parsing_method = "answer_tags"
             self.reaction_verifier_config.reward = self.reward
+            self.reaction_verifier_config.pg_name = self.pg_name
         return self
 
     class Config:

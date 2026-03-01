@@ -24,11 +24,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("molecular_verifier_server")
 logger.setLevel(logging.INFO)
 
-server_settings: MolecularVerifierServerSettings
+server_settings = MolecularVerifierServerSettings()
+if server_settings.ray_namespace is not None:
+    ray.init(address="auto", namespace=server_settings.ray_namespace)
+
 RemoteRewardScorer: Any = ray.remote(MolecularVerifier)
 
 server_settings_log = "Server settings:\n"
-for field_name, field_value in MolecularVerifierServerSettings().model_dump().items():
+for field_name, field_value in server_settings.model_dump().items():
     server_settings_log += f"  {field_name}: {field_value}\n"
 logger.info(server_settings_log)
 
