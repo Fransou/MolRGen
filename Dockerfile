@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------------------------------------
 # Base stage — environment setup with caching optimization
 # ------------------------------------------------------------------------------------------------------------
-FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS base
+FROM nvidia/cuda:13.1.1-cudnn-devel-ubuntu24.04  AS base
 
 USER root
 
@@ -9,18 +9,25 @@ USER root
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         wget make g++ libboost-filesystem-dev libboost-system-dev \
-        xutils-dev libxss1 xscreensaver xscreensaver-gl-extra xvfb python3 python3-dev python3-pip && \
+        xutils-dev libxss1 xscreensaver xscreensaver-gl-extra xvfb python3 python3-dev python3-venv && \
     ln -s /usr/bin/python3 /usr/bin/python && \
-    pip install --upgrade pip && \
     rm -rf /var/lib/apt/lists/*
+
+# Create and activate virtual environment
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv ${VIRTUAL_ENV}
+ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
 # Copy environment-related files first (for caching)
 COPY pyproject.toml ./
+
 COPY mol_gen_docking ./mol_gen_docking
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu && \
-    pip install ProDy uvicorn ringtail meeko openbabel-wheel && \
-    pip install --no-cache-dir .
+    pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --ignore-requires-python meeko==0.6.1 && \
+    pip install ProDy uvicorn ringtail openbabel-wheel && \
+    pip install pytdc==1.1.14 --no-deps
+RUN pip install .
 
 
 # ------------------------------------------------------------------------------------------------------------

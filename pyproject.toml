@@ -8,7 +8,7 @@ version = "2025.8.4"
 dependencies = [
     "torch>=2.6.0",
     "datasets",
-    "ray>=2.49.1",
+    "ray>=2.54.0",
     "pydantic",
     "pydantic_settings",
     "selfies",
@@ -26,7 +26,6 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "pdb-tools",
-    "pytdc==1.1.14",
     "jsonlines"
 ]
 
@@ -37,11 +36,15 @@ description = ""
 [project.optional-dependencies]
 model = [
     "vllm==0.10.1.1",
+    "pytdc==1.1.14",
     "transformers==4.57.3",
     "trl==0.24.0",
     "wandb",
     "peft==0.15.2",
     "flash_attn==2.8.0.post2"
+]
+main = [
+    "pytdc==1.1.14"
 ]
 
 [tool.mypy]

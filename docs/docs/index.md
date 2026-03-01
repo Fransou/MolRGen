@@ -8,11 +8,13 @@ Welcome to MolGenDocking, a comprehensive framework for molecular generation tas
 
 ### Installation
 
+**Basic Installation:**
 ```bash
 git clone https://github.com/Fransou/MolGenDocking.git
 cd MolGenDocking
-pip install -e .
+pip install -e .[main]
 ```
+*If called as `pip install .`, pytdc will not be installed.*
 
 ### Running the Reward Server
 
