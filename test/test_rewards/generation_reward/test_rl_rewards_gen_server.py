@@ -1,6 +1,7 @@
 """Tests for the RL Rewards generation server functionality."""
 
 import logging
+import os
 import time
 from typing import Any, Dict, List
 
@@ -27,7 +28,13 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 if not ray.is_initialized():
-    ray.init()
+    if os.environ.get("RAY_NAMESPACE") is not None:
+        logger.warning(
+            f"Initializing Ray with namespace: {os.environ.get('RAY_NAMESPACE')}"
+        )
+        ray.init(address="auto", namespace=os.environ.get("RAY_NAMESPACE"))
+    else:
+        ray.init()
 
 
 # =============================================================================
