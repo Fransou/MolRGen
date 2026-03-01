@@ -1,5 +1,5 @@
 import os
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -58,6 +58,11 @@ class ReactionVerifierConfigModel(BaseModel):
     reaction_reward_type: Literal["binary", "tanimoto"] = Field(
         default="tanimoto",
         description="For retro-synthesis, assign reward based on the exact match (binary) or Tanimoto similarity of the last product",
+    )
+
+    pg_name: Optional[str] = Field(
+        default=None,
+        description="Optional name of the Ray placement group to schedule tasks on.",
     )
 
     class Config:

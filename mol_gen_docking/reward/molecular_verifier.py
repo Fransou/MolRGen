@@ -9,7 +9,6 @@ import logging
 from typing import Any, Callable, Dict, List
 
 import ray
-from ray.experimental import tqdm_ray
 from rdkit import RDLogger
 
 from mol_gen_docking.reward.molecular_verifier_pydantic_model import (
@@ -83,7 +82,6 @@ class MolecularVerifier:
         """
         self.verifier_config = verifier_config
         self.__name__ = "RewardScorer/MolecularVerifier"
-        self.remote_tqdm = ray.remote(tqdm_ray.tqdm)
 
         self._generation_verifier: None | GenerationVerifier = None
         self._mol_prop_verifier: None | MolPropVerifier = None

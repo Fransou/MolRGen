@@ -9,6 +9,8 @@ import re
 from typing import Any, List
 
 from pydantic import BaseModel
+from ray.util.placement_group import get_placement_group
+from ray.util.scheduling_strategies import PlacementGroupSchedulingStrategy
 
 from mol_gen_docking.reward.verifiers.abstract_verifier_pydantic_model import (
     BatchVerifiersInputModel,
@@ -117,6 +119,29 @@ class Verifier:
                     f"Unknown parsing method: {self.verifier_config.parsing_method}"
                 )
         return tags_extraction
+
+    def get_placement_group_strat(self) -> None | PlacementGroupSchedulingStrategy:
+        """Get the Ray scheduling strategy for this verifier.
+
+        Only allowed if 'pg_name' is set in the verifier config.
+
+        Returns:
+            A Ray PlacementGroupSchedulingStrategy object defining the scheduling strategy.
+        """
+        if hasattr(self.verifier_config, "pg_name") and self.verifier_config.pg_name:
+            try:
+                pg = get_placement_group(self.verifier_config.pg_name)
+            except ValueError as e:
+                raise ValueError(
+                    f"Could not find placement group with name {self.verifier_config.pg_name}. "
+                    f"Make sure the placement group exists and the name is correct."
+                ) from e
+            return PlacementGroupSchedulingStrategy(
+                placement_group=pg,
+                placement_group_bundle_index=0,
+                placement_group_capture_child_tasks=True,
+            )
+        return None
 
     def get_score(self, inputs: BatchVerifiersInputModel) -> List[Any]:
         """Compute scores for a batch of inputs.

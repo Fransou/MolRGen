@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic_settings import BaseSettings
 
@@ -75,6 +75,17 @@ class MolecularVerifierServerSettings(BaseSettings):
             Useful for troubleshooting and development.
             Default: False
 
+        ray_namespace (Optional[str]): Optional namespace for the Ray cluster.
+            Used to connect to a specific Ray namespace when running distributed tasks.
+            If None, uses the default namespace.
+            Default: None
+
+        pg_name (Optional[str]): Optional name of the Ray placement group to use.
+            Specifies which placement group to use for scheduling Ray tasks,
+            allowing for better resource management and task isolation.
+            If None, no specific placement group is used.
+            Default: None
+
     Example:
         ```python
         from mol_gen_docking.server_utils.server_setting import MolecularVerifierServerSettings
@@ -102,8 +113,10 @@ class MolecularVerifierServerSettings(BaseSettings):
         - VINA_MODE
         - DATA_PATH
         - BUFFER_TIME
-        - PARSING_METHODS
+        - PARSING_METHOD
         - DEBUG_LOGGING
+        - RAY_NAMESPACE
+        - PG_NAME
     """
 
     server_mode: Literal["singleton", "batch"] = "singleton"
@@ -117,6 +130,8 @@ class MolecularVerifierServerSettings(BaseSettings):
     buffer_time: int = 20
     parsing_method: Literal["none", "answer_tags", "boxed"] = "answer_tags"
     debug_logging: bool = False
+    ray_namespace: Optional[str] = None
+    pg_name: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Validate all settings after initialization.
@@ -198,20 +213,23 @@ class MolecularVerifierServerSettings(BaseSettings):
             rescale=True,
             oracle_kwargs=oracle_kwargs,
             docking_concurrency_per_gpu=self.docking_concurrency_per_gpu,
+            pg_name=self.pg_name,
         )
 
         # Create ReactionVerifierConfigModel
         reaction_config = ReactionVerifierConfigModel(
             reaction_matrix_path=self.reaction_matrix_path,
             reward=reward,
+            pg_name=self.pg_name,
         )
 
         # Create MolPropVerifierConfigModel
-        molprop_config = MolPropVerifierConfigModel(reward=reward)
+        molprop_config = MolPropVerifierConfigModel(reward=reward, pg_name=self.pg_name)
 
         # Create and return MolecularVerifierConfigModel
         return MolecularVerifierConfigModel(
             parsing_method=self.parsing_method,
+            pg_name=self.pg_name,
             reward=reward,
             generation_verifier_config=generation_config,
             reaction_verifier_config=reaction_config,

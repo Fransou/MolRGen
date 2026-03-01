@@ -1,5 +1,5 @@
 import os
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -148,6 +148,11 @@ class GenerationVerifierConfigModel(BaseModel):
     parsing_method: Literal["none", "answer_tags", "boxed"] = Field(
         default="answer_tags",
         description="Method to parse model completions for SMILES or property values.",
+    )
+
+    pg_name: Optional[str] = Field(
+        default=None,
+        description="Optional name of the Ray placement group to schedule tasks on.",
     )
 
     class Config:

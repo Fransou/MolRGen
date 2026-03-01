@@ -273,12 +273,31 @@ class GenerationVerifier(Verifier):
 
             return [float(p) for p in property_reward]
 
-        _get_property_fast = ray.remote(num_cpus=0)(_get_property)
-        _get_property_long = ray.remote(
-            num_cpus=1,
-            num_gpus=float("gpu" in self.verifier_config.oracle_kwargs.docking_oracle)
-            / self.verifier_config.docking_concurrency_per_gpu,
-        )(_get_property)
+        # Prepare scheduling strategy if placement group is specified
+        scheduling_strategy = self.get_placement_group_strat()
+        # Create remote functions with optional placement group scheduling
+        if scheduling_strategy is not None:
+            _get_property_fast = ray.remote(
+                num_cpus=0,
+                scheduling_strategy=scheduling_strategy,
+            )(_get_property)
+            _get_property_long = ray.remote(
+                num_cpus=1,
+                num_gpus=float(
+                    "gpu" in self.verifier_config.oracle_kwargs.docking_oracle
+                )
+                / self.verifier_config.docking_concurrency_per_gpu,
+                scheduling_strategy=scheduling_strategy,
+            )(_get_property)
+        else:
+            _get_property_fast = ray.remote(num_cpus=0)(_get_property)
+            _get_property_long = ray.remote(
+                num_cpus=1,
+                num_gpus=float(
+                    "gpu" in self.verifier_config.oracle_kwargs.docking_oracle
+                )
+                / self.verifier_config.docking_concurrency_per_gpu,
+            )(_get_property)
 
         all_properties = df_properties["property"].unique().tolist()
         prop_smiles = {

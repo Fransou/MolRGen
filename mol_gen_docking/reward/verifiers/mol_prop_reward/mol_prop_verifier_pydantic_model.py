@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,11 @@ class MolPropVerifierConfigModel(BaseModel):
     parsing_method: Literal["none", "answer_tags", "boxed"] = Field(
         default="answer_tags",
         description="Method to parse model completions for SMILES or property values.",
+    )
+
+    pg_name: Optional[str] = Field(
+        default=None,
+        description="Optional name of the Ray placement group to schedule tasks on.",
     )
 
     class Config:

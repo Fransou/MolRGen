@@ -24,11 +24,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("molecular_verifier_server")
 logger.setLevel(logging.INFO)
 
-server_settings: MolecularVerifierServerSettings
+server_settings = MolecularVerifierServerSettings()
+# Only initialize Ray if not already initialized (e.g., by server_launcher)
+if server_settings.ray_namespace is not None and not ray.is_initialized():
+    ray.init(address="auto", namespace=server_settings.ray_namespace)
+elif server_settings.ray_namespace is not None and ray.is_initialized():
+    logger.info("Ray already initialized, skipping Ray initialization")
+
 RemoteRewardScorer: Any = ray.remote(MolecularVerifier)
 
 server_settings_log = "Server settings:\n"
-for field_name, field_value in MolecularVerifierServerSettings().model_dump().items():
+for field_name, field_value in server_settings.model_dump().items():
     server_settings_log += f"  {field_name}: {field_value}\n"
 logger.info(server_settings_log)
 
