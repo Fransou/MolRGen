@@ -113,7 +113,7 @@ class MolecularVerifierServerSettings(BaseSettings):
         - VINA_MODE
         - DATA_PATH
         - BUFFER_TIME
-        - PARSING_METHODS
+        - PARSING_METHOD
         - DEBUG_LOGGING
         - RAY_NAMESPACE
         - PG_NAME

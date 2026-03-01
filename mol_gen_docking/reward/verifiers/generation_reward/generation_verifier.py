@@ -14,7 +14,6 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 import pandas as pd
 import ray
-from ray.util.placement_group import get_placement_group
 from rdkit import Chem, RDLogger
 
 from mol_gen_docking.reward.verifiers.abstract_verifier import (
@@ -275,16 +274,7 @@ class GenerationVerifier(Verifier):
             return [float(p) for p in property_reward]
 
         # Prepare scheduling strategy if placement group is specified
-        scheduling_strategy = None
-        if self.verifier_config.pg_name is not None:
-            pg = get_placement_group(self.verifier_config.pg_name)
-            scheduling_strategy = (
-                ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(
-                    placement_group=pg,
-                    placement_group_capture_child_tasks=True,
-                )
-            )
-
+        scheduling_strategy = self.get_placement_group_strat()
         # Create remote functions with optional placement group scheduling
         if scheduling_strategy is not None:
             _get_property_fast = ray.remote(
