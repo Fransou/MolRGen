@@ -81,6 +81,7 @@ RUN set -eux; \
 
 # expose ADFRsuite bin (if present) and common lib path (some ADFR tools use their own libs)
 ENV PATH="/opt/ADFRsuite/bin:${PATH}"
+ENV PATH="${VIRTUAL_ENV}/bin:/opt/ADFRsuite/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/opt/ADFRsuite/lib:${LD_LIBRARY_PATH:-}"
 
 WORKDIR /
