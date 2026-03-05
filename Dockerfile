@@ -5,31 +5,30 @@ FROM nvidia/cuda:13.1.1-cudnn-devel-ubuntu24.04  AS base
 
 USER root
 
-# Install system dependencies (split to preserve caching)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         wget make g++ libboost-filesystem-dev libboost-system-dev \
-        xutils-dev libxss1 xscreensaver xscreensaver-gl-extra xvfb python3 python3-dev python3-venv && \
-    rm -rf /var/lib/apt/lists/*
+        xutils-dev libxss1 xscreensaver xscreensaver-gl-extra xvfb \
+        python3 python3-dev python3-pip && \
+    rm -rf /var/lib/apt/lists/* && \
+    ln -s /usr/bin/python3 /usr/bin/python
 
-# Create and activate virtual environment
-ENV VIRTUAL_ENV=/opt/venv
-RUN python3 -m venv ${VIRTUAL_ENV}
-ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
-
-# Ensure venv is activated for all bash sessions
-RUN echo "source ${VIRTUAL_ENV}/bin/activate" >> /root/.bashrc
+# 2. Set an environment variable to bypass the "Externally Managed Environment" error
+# This is cleaner than adding --break-system-packages to every single line.
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Copy environment-related files first (for caching)
 COPY pyproject.toml ./
-
 COPY mol_gen_docking ./mol_gen_docking
+
+# 3. Install packages directly to the system Python
 RUN --mount=type=cache,target=/root/.cache/pip \
-    ${VIRTUAL_ENV}/bin/pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu && \
-    ${VIRTUAL_ENV}/bin/pip install --ignore-requires-python meeko==0.6.1 && \
-    ${VIRTUAL_ENV}/bin/pip install ProDy uvicorn ringtail openbabel-wheel && \
-    ${VIRTUAL_ENV}/bin/pip install pytdc==1.1.14 --no-deps
-RUN ${VIRTUAL_ENV}/bin/pip install .
+    pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --ignore-requires-python meeko==0.6.1 && \
+    pip install ProDy uvicorn ringtail openbabel-wheel && \
+    pip install pytdc==1.1.14 --no-deps
+
+RUN pip install .
 
 
 # ------------------------------------------------------------------------------------------------------------
@@ -81,7 +80,6 @@ RUN set -eux; \
 
 # expose ADFRsuite bin (if present) and common lib path (some ADFR tools use their own libs)
 ENV PATH="/opt/ADFRsuite/bin:${PATH}"
-ENV PATH="${VIRTUAL_ENV}/bin:/opt/ADFRsuite/bin:${PATH}"
 ENV LD_LIBRARY_PATH="/opt/ADFRsuite/lib:${LD_LIBRARY_PATH:-}"
 
 WORKDIR /
