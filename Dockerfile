@@ -20,12 +20,16 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 # Copy environment-related files first (for caching)
 COPY pyproject.toml ./
 COPY mol_gen_docking ./mol_gen_docking
+COPY test ./test
+COPY data/properties.csv ./data/properties.csv
 
 # 3. Install packages directly to the system Python
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu && \
+    pip install rdkit==2024.3.5 && \
     pip install --ignore-requires-python meeko==0.6.1 && \
     pip install ProDy uvicorn ringtail openbabel-wheel && \
+    pip install ray==2.52.1 && \
     pip install pytdc==1.1.14 --no-deps
 
 RUN pip install .
@@ -79,7 +83,7 @@ RUN set -eux; \
     rm -rf /tmp/vina.tgz /opt/autodock_vina_1_1_2_linux_x86
 
 # expose ADFRsuite bin (if present) and common lib path (some ADFR tools use their own libs)
-ENV PATH="/opt/ADFRsuite/bin:${PATH}"
+ENV PATH="${PATH}:/opt/ADFRsuite/bin"
 ENV LD_LIBRARY_PATH="/opt/ADFRsuite/lib:${LD_LIBRARY_PATH:-}"
 
 WORKDIR /

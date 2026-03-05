@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Literal, Optional
 
+import ray
 from pydantic_settings import BaseSettings
 
 from mol_gen_docking.reward import (
@@ -86,6 +87,17 @@ class MolecularVerifierServerSettings(BaseSettings):
             If None, no specific placement group is used.
             Default: None
 
+        ray_ip (Optional[str]): Optional IP address of the Ray cluster head node.
+            Used to connect to an existing Ray cluster. If None and ray_port is also None,
+            Ray will be initialized locally with address="auto".
+            Default: None
+
+        ray_port (Optional[int]): Optional port number for the Ray cluster head node.
+            Used in conjunction with ray_ip to connect to an existing Ray cluster.
+            Ignored if ray_ip is None.
+            Default: None
+
+
     Example:
         ```python
         from mol_gen_docking.server_utils.server_setting import MolecularVerifierServerSettings
@@ -117,6 +129,8 @@ class MolecularVerifierServerSettings(BaseSettings):
         - DEBUG_LOGGING
         - RAY_NAMESPACE
         - PG_NAME
+        - RAY_IP
+        - RAY_PORT
     """
 
     server_mode: Literal["singleton", "batch"] = "singleton"
@@ -132,6 +146,9 @@ class MolecularVerifierServerSettings(BaseSettings):
     debug_logging: bool = False
     ray_namespace: Optional[str] = None
     pg_name: Optional[str] = None
+    ray_ip: Optional[str] = None
+    ray_port: Optional[int] = None
+    ray_tmp_dir: Optional[str] = None
 
     def __post_init__(self) -> None:
         """Validate all settings after initialization.
@@ -235,3 +252,20 @@ class MolecularVerifierServerSettings(BaseSettings):
             reaction_verifier_config=reaction_config,
             mol_prop_verifier_config=molprop_config,
         )
+
+    def ray_init(self) -> None:
+        if ray.is_initialized():
+            return
+        init_kwargs = {}
+        if self.ray_namespace is not None:
+            init_kwargs["namespace"] = self.ray_namespace
+        if self.ray_tmp_dir is not None:
+            init_kwargs["_temp_dir"] = self.ray_tmp_dir
+        if self.ray_ip is not None:
+            init_kwargs["address"] = self.ray_ip
+            if self.ray_port is not None:
+                init_kwargs["address"] += f":{self.ray_port}"
+        else:
+            init_kwargs["address"] = "auto"
+
+        ray.init(**init_kwargs)
