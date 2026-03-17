@@ -6,6 +6,9 @@ from typing import Any, AsyncGenerator, Dict
 
 import ray
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi_mcp import FastApiMCP
 
 from mol_gen_docking.data.meeko_process import ReceptorProcess
 from mol_gen_docking.reward import (
@@ -39,6 +42,16 @@ _valid_reward_model = None
 
 
 def get_or_create_reward_actor() -> Any:
+    """
+    Get or create a Ray remote actor for molecular reward scoring.
+
+    Creates a new remote MolecularVerifier actor if one doesn't exist or if the
+    existing actor has been terminated. Uses Ray remote execution to enable
+    distributed computation of reward scores.
+
+    Returns:
+        Any: A Ray remote actor reference for the MolecularVerifier.
+    """
     global _reward_model
     global server_settings
     if _reward_model is None or _reward_model.__ray_terminated__:
@@ -50,6 +63,22 @@ def get_or_create_reward_actor() -> Any:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """
+    Manage the application lifecycle - startup and shutdown.
+
+    Initializes server resources on startup:
+    - Reinitializes server settings
+    - Creates reward buffer for batching queries
+    - Creates or retrieves the reward model actor
+    - Initializes receptor processor if using autodock_gpu
+    - Loads receptor/pocket information from data files
+
+    Args:
+        app (FastAPI): The FastAPI application instance.
+
+    Yields:
+        None: Control to the application during runtime.
+    """
     global server_settings
     server_settings = MolecularVerifierServerSettings()
     logger.info(
@@ -78,16 +107,58 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(lifespan=lifespan)
+    """
+    Create and configure the FastAPI application.
 
-    @app.get("/liveness")  # type: ignore
+    Initializes the FastAPI application with:
+    - Application lifecycle management (startup/shutdown)
+    - Static file mounting for documentation and assets
+    - Multiple API endpoints for molecular verification
+    - Favicon serving
+
+    Returns:
+        FastAPI: A configured FastAPI application instance.
+    """
+    app = FastAPI(lifespan=lifespan)
+    app.mount("/static", StaticFiles(directory="docs/docs/assets"), name="static")
+
+    @app.get("/favicon.ico", include_in_schema=False)  # type: ignore
+    async def favicon() -> FileResponse:
+        """
+        Serve the application favicon.
+
+        Returns:
+            FileResponse: The favicon image file (logo.png).
+        """
+        return FileResponse("docs/docs/assets/logo.png")
+
+    @app.get("/liveness", include_in_schema=False)  # type: ignore
     async def live_check() -> dict[str, str]:
+        """
+        Health check endpoint for server liveness.
+
+        Returns:
+            dict[str, str]: A dictionary containing the status "ok" if the server is alive.
+        """
         return {"status": "ok"}
 
-    @app.post("/get_reward")  # type: ignore
+    @app.post("/get_reward", include_in_schema=False)  # type: ignore
     async def get_reward(
         query: MolecularVerifierServerQuery,
     ) -> MolecularVerifierServerResponse | BatchMolecularVerifierServerResponse:
+        """
+        Compute a reward value for a completion associated to a given prompt/metadata.
+        Handles molecular generation, property predicion and retrosynthesis planning.
+
+        Args:
+            query (MolecularVerifierServerQuery): The query containing SMILES strings,
+                docking targets, and metadata.
+
+        Returns:
+            MolecularVerifierServerResponse | BatchMolecularVerifierServerResponse:
+                Reward scores and metadata for the query. Type depends on server_mode.
+                Returns singleton response in singleton mode or batch response in batch mode.
+        """
         if server_settings.server_mode == "singleton":
             # Ensures the query does not contain multiple items
             if len(query.metadata) != 1:
@@ -143,8 +214,30 @@ def create_app() -> FastAPI:
                     )
         return result
 
-    @app.post("/prepare_receptor")  # type: ignore
+    @app.post(
+        "/prepare_receptor",
+        include_in_schema=False,
+        operation_id="""
+        prepare_receptor
+        """,
+    )  # type: ignore
     async def prepare_receptor(query: MolecularVerifierServerQuery) -> Dict[str, str]:
+        """
+        Prepare docking targets/receptors for molecular docking.
+
+        Extracts target receptors from query metadata and processes them if necessary.
+        This function handles receptor preparation steps required for autodock_gpu
+        operations. If no receptor processor is configured, returns success immediately.
+
+        Args:
+            query (MolecularVerifierServerQuery): The query containing metadata with
+                target receptor information.
+
+        Returns:
+            Dict[str, str]: A dictionary with:
+                - "status": "Success" or "Error" indicating operation status
+                - "info": Optional error details if status is "Error"
+        """
         metadata = query.metadata
 
         if app.state.receptor_processor is None:
@@ -188,3 +281,23 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+mcp = FastApiMCP(
+    app,
+    name="Molecular Verifier Server",
+    description="""
+    An MCP server that can be used to perform molecular generation / property prediction and retrosythesis planning tasks.
+
+    This server can notably be used to evaluate the quality of an answer (generated molecule, predicted property value, ...) based on the query.
+    """,
+    describe_all_responses=True,
+    describe_full_response_schema=True,
+    include_operations=["get_reward"],
+)
+mcp.mount_http()
+mcp.setup_server()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)

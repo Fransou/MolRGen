@@ -49,7 +49,8 @@ model = [
     "flash_attn==2.8.0.post2"
 ]
 main = [
-    "pytdc==1.1.14"
+    "pytdc==1.1.14",
+    "fastapi-mcp"
 ]
 
 [tool.mypy]
