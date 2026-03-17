@@ -4,10 +4,10 @@ This module defines tools that can be exposed through the MCP (Model Context Pro
 interface for external clients to interact with the molecular verifier functionality.
 """
 
-from typing import Any, Dict, List, Literal
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import FastAPI
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from mol_gen_docking.reward.verifiers import (
     GenerationVerifierInputMetadataModel,
@@ -22,6 +22,20 @@ from mol_gen_docking.server_utils.utils import (
 from mol_gen_docking.utils.property_utils import CLASSICAL_PROPERTIES_NAMES
 
 TaskType = Literal["molecular_generation", "property_prediction", "molecular_reaction"]
+
+
+class ComputePropertiesRequest(BaseModel):
+    """Request model for the compute_properties endpoint.
+
+    Attributes:
+        smiles: SMILES string representing the molecule to evaluate.
+        properties: List of property names to compute. Must be valid RDKit
+            property names as returned by get_available_rdkit_properties
+            (e.g., "QED", "SA", "logP", "CalcExactMolWt", etc.).
+    """
+
+    smiles: str
+    properties: List[str]
 
 
 def _validate_metadata(
@@ -209,3 +223,48 @@ def register_mcp_tools(
             json=query.model_dump(),
         )
         return response  # type: ignore
+
+    @app.post(
+        "/compute_properties",
+        operation_id="compute_properties",
+    )  # type: ignore
+    def compute_properties(
+        request: ComputePropertiesRequest,
+    ) -> Dict[str, Optional[float]]:
+        """Compute molecular property values for a single SMILES string.
+
+        Given a SMILES string and a list of property names, returns the actual
+        computed property values using RDKit oracles. Use
+        get_available_rdkit_properties to retrieve the list of supported property
+        names.
+
+        Args:
+            request: A ComputePropertiesRequest containing:
+                - smiles: The SMILES string of the molecule to evaluate.
+                - properties: List of RDKit property names to compute
+                  (e.g., ["QED", "SA", "logP", "CalcExactMolWt"]).
+
+        Returns:
+            Dict[str, Optional[float]]: A dictionary mapping each requested
+                property name to its computed float value, or None if the SMILES
+                is invalid or the property computation fails.
+
+        Example:
+            ```python
+            result = compute_properties(
+                ComputePropertiesRequest(
+                    smiles="CCO",
+                    properties=["QED", "SA", "logP"]
+                )
+            )
+            # Returns: {"QED": 0.40, "SA": 1.58, "logP": -0.11}
+            ```
+        """
+        import ray
+
+        reward_actor = app.state.reward_model
+        job = reward_actor.compute_properties.remote(
+            smiles=request.smiles, properties=request.properties
+        )
+        result: Dict[str, Optional[float]] = ray.get(job)
+        return result

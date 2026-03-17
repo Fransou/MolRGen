@@ -6,10 +6,11 @@ Ray for parallel processing and supports GPU-accelerated docking calculations.
 """
 
 import logging
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict, List, Optional
 
 import ray
 from rdkit import RDLogger
+from rdkit.Chem import MolFromSmiles
 
 from mol_gen_docking.reward.molecular_verifier_pydantic_model import (
     BatchMolecularVerifierOutputModel,
@@ -300,6 +301,56 @@ class MolecularVerifier:
             parsed_answers=parsed_answers,
             verifier_metadatas=metadata_output,
         )
+
+    def compute_properties(
+        self,
+        smiles: str,
+        properties: List[str],
+    ) -> Dict[str, Optional[float]]:
+        """Compute molecular property values for a single SMILES string.
+
+        Evaluates each requested property using RDKit oracles. Returns None
+        for any property whose computation fails or when the SMILES is invalid.
+
+        Args:
+            smiles: SMILES string representing the molecule.
+            properties: List of property names to compute. Must be valid RDKit
+                property names from CLASSICAL_PROPERTIES_NAMES values
+                (e.g., "QED", "SA", "logP", "CalcExactMolWt", etc.).
+
+        Returns:
+            Dict mapping each requested property name to its computed float value,
+            or None if the SMILES is invalid or the property computation fails.
+
+        Example:
+            ```python
+            result = verifier.compute_properties("CCO", ["QED", "SA", "logP"])
+            # Returns something like: {"QED": 0.40, "SA": 1.58, "logP": -0.11}
+            ```
+        """
+        from mol_gen_docking.reward.verifiers.generation_reward.oracles.rdkit_oracle import (
+            RDKITOracle,
+        )
+
+        mol = MolFromSmiles(smiles)
+        if mol is None:
+            return {prop: None for prop in properties}
+
+        result: Dict[str, Optional[float]] = {}
+        for prop in properties:
+            try:
+                oracle = RDKITOracle(prop)
+                value = oracle(smiles)
+                result[prop] = float(value)
+            except ValueError:
+                result[prop] = None
+            except Exception:
+                self.logger.warning(
+                    f"Unexpected error computing property '{prop}' for SMILES '{smiles}'",
+                    exc_info=True,
+                )
+                result[prop] = None
+        return result
 
     def __call__(
         self,
