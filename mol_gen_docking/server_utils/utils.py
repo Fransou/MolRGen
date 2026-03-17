@@ -63,13 +63,11 @@ class MolecularVerifierServerQuery(BaseModel):
     {
       "query": "Here is a molecules: <answer>CC(C)Cc1ccc(cc1)C(C)C(=O)O</answer>",
       "prompt": "Generate a molecule that binds to my target protein with high affinity and has more than 3 rotatable bonds.",
-      "metadata": [
-        {
+      "metadata": {
           "properties": ["CalcNumRotatableBonds", "sample_228234_model_0"],
           "objectives": ["above", "minimize"],
           "target": [3.0, 0.0]
         }
-      ]
     }
     ```
     """
