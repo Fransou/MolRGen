@@ -1,26 +1,38 @@
 # ------------------------------------------------------------------------------------------------------------
 # Base stage — environment setup with caching optimization
 # ------------------------------------------------------------------------------------------------------------
-FROM nvidia/cuda:12.1.0-devel-ubuntu22.04 AS base
+FROM nvidia/cuda:13.1.1-cudnn-devel-ubuntu24.04  AS base
 
 USER root
 
-# Install system dependencies (split to preserve caching)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         wget make g++ libboost-filesystem-dev libboost-system-dev \
-        xutils-dev libxss1 xscreensaver xscreensaver-gl-extra xvfb python3 python3-dev python3-pip && \
-    ln -s /usr/bin/python3 /usr/bin/python && \
-    pip install --upgrade pip && \
-    rm -rf /var/lib/apt/lists/*
+        xutils-dev libxss1 xscreensaver xscreensaver-gl-extra xvfb \
+        python3 python3-dev python3-pip && \
+    rm -rf /var/lib/apt/lists/* && \
+    ln -s /usr/bin/python3 /usr/bin/python
+
+# 2. Set an environment variable to bypass the "Externally Managed Environment" error
+# This is cleaner than adding --break-system-packages to every single line.
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Copy environment-related files first (for caching)
 COPY pyproject.toml ./
 COPY mol_gen_docking ./mol_gen_docking
+COPY test ./test
+COPY data/properties.csv ./data/properties.csv
+
+# 3. Install packages directly to the system Python
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --no-cache-dir torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu && \
-    pip install ProDy uvicorn ringtail meeko openbabel-wheel && \
-    pip install --no-cache-dir .
+    pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu && \
+    pip install rdkit==2024.3.5 && \
+    pip install --ignore-requires-python meeko==0.6.1 && \
+    pip install ProDy uvicorn ringtail openbabel-wheel && \
+    pip install ray==2.52.1 && \
+    pip install pytdc==1.1.14 --no-deps
+
+RUN pip install .
 
 
 # ------------------------------------------------------------------------------------------------------------
@@ -71,7 +83,7 @@ RUN set -eux; \
     rm -rf /tmp/vina.tgz /opt/autodock_vina_1_1_2_linux_x86
 
 # expose ADFRsuite bin (if present) and common lib path (some ADFR tools use their own libs)
-ENV PATH="/opt/ADFRsuite/bin:${PATH}"
+ENV PATH="${PATH}:/opt/ADFRsuite/bin"
 ENV LD_LIBRARY_PATH="/opt/ADFRsuite/lib:${LD_LIBRARY_PATH:-}"
 
 WORKDIR /

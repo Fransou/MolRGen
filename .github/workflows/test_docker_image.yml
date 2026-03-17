@@ -29,4 +29,4 @@ jobs:
 
     - name: Test with pytest
       run: |
-        docker run -v ${PWD}:/data fransou/molgen:latest pytest test/test_rewards --skip-docking
+        docker run -v ${PWD}/data:/data fransou/molgen:latest pytest test/test_rewards --skip-docking

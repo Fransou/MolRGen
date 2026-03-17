@@ -13,10 +13,9 @@ A comprehensive framework for molecular generation tasks with integrated protein
 ```bash
 git clone https://github.com/Fransou/MolGenDocking.git
 cd MolGenDocking
-pip install -e .
+pip install -e .[main]
 ```
 
-Requires Python >= 3.10. For molecular docking, ensure [AutoDock-GPU](https://github.com/ccsb-scripps/AutoDock-GPU) is installed and available in your PATH.
 
 **Docker** (recommended):
 ```bash

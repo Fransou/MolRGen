@@ -25,11 +25,7 @@ logger = logging.getLogger("molecular_verifier_server")
 logger.setLevel(logging.INFO)
 
 server_settings = MolecularVerifierServerSettings()
-# Only initialize Ray if not already initialized (e.g., by server_launcher)
-if server_settings.ray_namespace is not None and not ray.is_initialized():
-    ray.init(address="auto", namespace=server_settings.ray_namespace)
-elif server_settings.ray_namespace is not None and ray.is_initialized():
-    logger.info("Ray already initialized, skipping Ray initialization")
+server_settings.ray_init()
 
 RemoteRewardScorer: Any = ray.remote(MolecularVerifier)
 
