@@ -95,8 +95,8 @@ def inverse_rescale_property_values(
     value = value * (max_val - min_val) + min_val
     if prop_name in INTEGER_PROPS:
         value = int(value)
-        if value <= min_val + 1:
-            value = min_val + 2
-        elif value >= max_val - 1:
-            value = max_val - 2
+        # if value <= min_val + 1:
+        #     value = min_val + 2
+        # elif value >= max_val - 1:
+        #     value = max_val - 2
     return value

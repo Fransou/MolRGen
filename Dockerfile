@@ -87,4 +87,4 @@ ENV PATH="${PATH}:/opt/ADFRsuite/bin"
 ENV LD_LIBRARY_PATH="/opt/ADFRsuite/lib:${LD_LIBRARY_PATH:-}"
 
 WORKDIR /
-CMD ["/bin/bash"]
+CMD ["BUFFER_TIME=1", "PARSING_METHOD=none", "SERVER_MODE=batch", "python", "-m", "mol_gen_docking.server_mcp"]
