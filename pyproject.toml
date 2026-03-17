@@ -48,8 +48,5 @@ model = [
 disable_error_code = ["type-arg"]
 plugins = ["pydantic.mypy"]
 
-[project.entry-points."vllm.general_plugins"]
-register_dummy_model = "mol_gen_docking.models.vllm_model.register:register"
-
 [tool.hatch.build.targets.wheel]
-    packages = ["src/mol_gen_docking"]
+    packages = ["mol_gen_docking"]

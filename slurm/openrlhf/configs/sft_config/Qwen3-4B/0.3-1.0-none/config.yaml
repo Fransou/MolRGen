@@ -1,0 +1,8 @@
+model_name: Qwen3-4B
+training:
+  dataset_path: SftData/min_reward_threshold_0.3/div_threshold_None/fingerprint_name_ecfp6-2048/source_info_template_empty/boxed_True/molgendata_train.jsonl
+  config_train: slurm/openrlhf/configs/sft_config/Qwen3-4B/0.3-1.0-none/train.yaml
+  output_path: Qwen3-4B-0.3-1.0-none
+evaluation:
+  dataset_eval: molgendata
+  eval_config: slurm/openrlhf/configs/sft_config/Qwen3-4B/0.3-1.0-none/eval.yaml

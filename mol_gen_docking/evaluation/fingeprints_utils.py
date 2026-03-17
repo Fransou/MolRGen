@@ -143,3 +143,35 @@ def get_sim_matrix(
     ]
     matrix: np.ndarray[float] = np.concatenate(sim_mat)
     return matrix
+
+
+def get_csim_matrix(
+    molsA: list[Chem.Mol],
+    molsB: list[Chem.Mol],
+    fingerprint_name: str = "ecfp4-1024",
+) -> np.ndarray[float]:
+    """Compute a pairwise similarity matrix between two sets of molecules.
+
+    This function computes Tanimoto similarities between all pairs of molecules
+    from two different sets using the specified fingerprint method. The result is
+    a 2D NumPy array where entry (i, j) contains the similarity between molsA[i]
+    and molsB[j].
+
+    Args:
+        molsA: List of RDKit Mol objects for the first set.
+        molsB: List of RDKit Mol objects for the second set.
+        fingerprint_name: Name of the fingerprint to use for similarity calculation.
+            Default is "ecfp4-1024" (ECFP with diameter 4 and 1024 bits).
+            See fp_name_to_fn for supported options.
+
+    Returns:
+        A 2D NumPy array of shape (len(molsA), len(molsB)) containing the pairwise
+        similarity values between molecules in molsA and molsB.
+    """
+    fp_fn = fp_name_to_fn(fingerprint_name)
+    fpsA = [fp_fn(mol) for mol in molsA]
+    fpsB = [fp_fn(mol) for mol in molsB]
+    sim_mat = np.zeros((len(molsA), len(molsB)), dtype=float)
+    for i, fpA in enumerate(fpsA):
+        sim_mat[i, :] = np.array(DataStructs.BulkTanimotoSimilarity(fpA, fpsB))
+    return sim_mat

@@ -29,25 +29,27 @@ def load_molgen_results(
         with f.open("r") as fd:
             for i_l, line in enumerate(fd):
                 g = json.loads(line)
-                all_smis = g["reward_meta"].get("all_smi", [""])
+                reward_metadata = g["reward_meta"].get(
+                    "generation_verifier_metadata", {}
+                )
+                all_smis = reward_metadata.get("all_smi", [""])
                 fail_reason = "valid"
                 if len(all_smis) == 0:
                     valid = 0
                     smiles = ""
                     reward = 0.0
                     fail_reason = (
-                        g["reward_meta"]
-                        .get("smiles_extraction_failure", "unknown")
+                        reward_metadata.get("smiles_extraction_failure", "unknown")
                         .replace("_", " ")
                         .replace("smiles", "SMILES")
                     )
                 elif len(all_smis) > 1:
                     valid = 1
                     smiles = all_smis[-1]
-                    if g["reward_meta"]["all_smi_rewards"][-1] is None:
+                    if reward_metadata["all_smi_rewards"][-1] is None:
                         reward = 0.0
                     else:
-                        reward = float(g["reward_meta"]["all_smi_rewards"][-1])
+                        reward = float(reward_metadata["all_smi_rewards"][-1])
                 else:
                     valid = 1
                     smiles = all_smis[0]
