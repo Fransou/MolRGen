@@ -184,6 +184,8 @@ SFT*
 /data/molgendata/eval_data
 /data/molgendata/test_data
 /data/molgendata/train_data
+/data/traces
+/data/sft
 /data/*.tar.gz
 /data/*.zip
 /data/*.tab

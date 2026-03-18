@@ -30,6 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --ignore-requires-python meeko==0.6.1 && \
     pip install ProDy uvicorn ringtail openbabel-wheel && \
     pip install ray==2.52.1 && \
+    pip install fastapi-mcp && \
     pip install pytdc==1.1.14 --no-deps
 
 RUN pip install .
@@ -48,7 +49,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/build
-RUN git clone --depth 1 https://github.com/ccsb-scripps/AutoDock-GPU.git
+RUN git clone https://github.com/ccsb-scripps/AutoDock-GPU.git && \
+    git checkout v1.6
 
 ENV GPU_INCLUDE_PATH=/usr/local/cuda/include
 ENV GPU_LIBRARY_PATH=/usr/local/cuda/lib64
@@ -87,4 +89,28 @@ ENV PATH="${PATH}:/opt/ADFRsuite/bin"
 ENV LD_LIBRARY_PATH="/opt/ADFRsuite/lib:${LD_LIBRARY_PATH:-}"
 
 WORKDIR /
+
+# Expose port 8000 for the API server
+EXPOSE 8000
+
+# Create entry point script to handle command selection
+RUN echo '#!/bin/bash' > /usr/local/bin/docker-entrypoint.sh && \
+    echo 'if [ "$1" = "mcp-server" ]; then' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '  exec BUFFER_TIME=1 PARSING_METHOD=none SERVER_MODE=batch python -m mol_gen_docking.server_mcp' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'elif [ "$1" = "api-server" ]; then' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '  exec python -m mol_gen_docking.server' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'else' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '  exec "$@"' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["/bin/bash"]
+{
+  "smiles": [
+    "CCCCC"
+  ],
+  "properties": [
+    "sample_347546_model_0"
+  ]
+}

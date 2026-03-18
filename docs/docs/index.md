@@ -16,6 +16,8 @@ pip install -e .[main]
 ```
 *If called as `pip install .`, pytdc will not be installed.*
 
+**Note:** This installation requires OpenBabel to be installed on your system. OpenBabel is used for molecular file format conversions and processing.
+
 ### Running the Reward Server
 
 ```bash
@@ -49,6 +51,9 @@ response = requests.post(
 ⚙️ **Reward Server API**
 We use AutoDock-GPU for fast GPU-accelerated docking calculations.
 The Molecular Verifier server is built using FastAPI, and supports concurrent requests, ensuring efficient handling of multiple docking evaluations, and asynchroneous pipelines.
+
+🤖 **MCP Server Support**
+The server also includes MCP (Model Context Protocol) support for seamless integration with AI workflows and language models that use MCP for tool calling and function execution.
 
 ## Citation
 

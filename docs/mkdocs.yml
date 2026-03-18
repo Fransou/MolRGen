@@ -38,6 +38,7 @@ nav:
       - Server Configuration: reward_server/server_configuration.md
       - Query / Answer Format: reward_server/query_answer_format.md
       - Server Endpoints: reward_server/endpoints.md
+      - MCP Server: reward_server/mcp_server.md
       - Async Reference: reward_server/Server_Asynchronous.md
   - API Documentation:
       - Introduction: api/toc.md
