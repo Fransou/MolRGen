@@ -105,8 +105,9 @@ async def get_reward_endpoint(
                 reward=0.0, error="Error in preprocessing"
             )
         elif server_settings.server_mode == "batch":
+            num_items = len(query.metadata)
             return BatchMolecularVerifierServerResponse(
-                rewards=[0.0], error="Error in preprocessing"
+                rewards=[0.0] * num_items, error="Error in preprocessing"
             )
 
     result: (
