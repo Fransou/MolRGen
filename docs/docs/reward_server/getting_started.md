@@ -27,6 +27,14 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 INFO:     Application startup complete
 ```
 
+**For MCP Server:**
+
+To start the server with MCP (Model Context Protocol) support:
+
+```bash
+python mol_gen_docking/server_mcp.py
+```
+
 ## Basic Usage
 
 ### Python Client
@@ -56,3 +64,4 @@ response = requests.post(
 - Explore how to configure the server in [Server Configuration](server_configuration.md)
 - Understand the query and response formats in [Query and Answer Format](query_answer_format.md)
 - Learn about the full API in [API Documentation](endpoints.md)
+- Discover MCP server capabilities in [MCP Server](mcp_server.md)

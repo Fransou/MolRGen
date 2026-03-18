@@ -1,3 +1,4 @@
+import logging
 import time
 from typing import Dict
 
@@ -9,6 +10,8 @@ from mol_gen_docking.server_utils.utils import (
     MolecularVerifierServerQuery,
     MolecularVerifierServerResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 
 async def prepare_receptor_endpoint(
@@ -114,8 +117,6 @@ async def get_reward_endpoint(
         MolecularVerifierServerResponse | BatchMolecularVerifierServerResponse
     ) = await app.state.reward_buffer.add_query(query)
     t1 = time.time()
-    from mol_gen_docking.server_utils.server_app import logger
-
     logger.info(f"Processed batch in {t1 - t0:.2f} seconds")
     if server_settings.debug_logging:
         logger.info(f"=== Query: {query}\n=== Result: {result}")
