@@ -5,15 +5,19 @@ interface for external clients to interact with the molecular verifier functiona
 """
 
 import json
-from typing import Any, Dict, List, Literal
+import os
+from typing import Any, Dict, List, Literal, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, ValidationError
 
 from mol_gen_docking.reward.verifiers import (
     GenerationVerifierInputMetadataModel,
     MolPropVerifierInputMetadataModel,
     ReactionVerifierInputMetadataModel,
+)
+from mol_gen_docking.reward.verifiers.generation_reward.oracles.vinagpu_oracle import (
+    DockingMoleculeGpuOracle,
 )
 from mol_gen_docking.server_utils.server_endpoints.get_reward import (
     get_reward_endpoint,
@@ -38,6 +42,34 @@ class CalcPropInput(BaseModel):
     properties: List[str] = Field(
         default_factory=list,
         description="Properties to compute (for example: QED, logP, SA, etc.)",
+    )
+
+
+class RunDockingSimulationInput(BaseModel):
+    smiles: List[str] = Field(
+        ...,
+        description=(
+            "List of SMILES strings of the molecules to dock against the receptor."
+        ),
+    )
+    receptor_name: str = Field(
+        ...,
+        description=(
+            "Identifier of the docking target. "
+            "Use the get_available_docking_targets tool to list valid values."
+        ),
+    )
+    output_dir: Optional[str] = Field(
+        default=None,
+        description=(
+            "Directory where the output .dlg files will be saved. "
+            "Defaults to 'docking_outputs/<receptor_name>/' relative to the "
+            "server working directory. An absolute path is recommended."
+        ),
+    )
+    gpu_ids: List[int] = Field(
+        default=[0],
+        description="GPU device IDs to use for docking (default: [0]).",
     )
 
 
@@ -320,3 +352,144 @@ def register_mcp_tools(
         This endpoint is typically called when a client disconnects or wants to clean up resources.
         """
         return {"status": "ok", "message": "MCP endpoint DELETE request handled"}
+
+    @app.post(
+        "/run_docking_simulation",
+        operation_id="run_docking_simulation",
+    )  # type: ignore
+    async def run_docking_simulation(
+        input: RunDockingSimulationInput,
+    ) -> Dict[str, Any]:
+        """Run docking simulations with AutoDock-GPU and persist the output .dlg files.
+
+        This tool is **only available** when the server is configured to use
+        AutoDock-GPU (``docking_oracle == "autodock_gpu"``).  It prepares the
+        requested receptor if necessary, docks each SMILES string against it,
+        and writes the raw AutoDock-GPU ``.dlg`` output files to a persistent
+        directory so that an AI agent can read and analyse the full docking
+        results afterwards.
+
+        Args:
+            input (RunDockingSimulationInput):
+                - ``smiles``: list of SMILES strings to dock.
+                - ``receptor_name``: identifier of the docking target (see
+                  ``get_available_docking_targets`` for the list of valid names).
+                - ``output_dir``: directory where ``.dlg`` files are saved.
+                  Defaults to ``docking_outputs/<receptor_name>/`` relative to
+                  the server working directory.
+                - ``gpu_ids``: GPU device IDs to use (default: ``[0]``).
+
+        Returns:
+            Dict[str, Any]:
+                - ``"scores"``: mapping from each SMILES string to its best
+                  docking score (kcal/mol, ``None`` if docking failed for that
+                  molecule).
+                - ``"dlg_files"``: list of absolute paths to the saved ``.dlg``
+                  files.
+                - ``"output_dir"``: absolute path to the output directory.
+
+        Raises:
+            HTTPException 400: If the server is not using AutoDock-GPU.
+            HTTPException 404: If ``receptor_name`` is not a known target.
+            HTTPException 500: If docking fails to produce any output.
+
+        Example:
+            ```python
+            result = run_docking_simulation(
+                RunDockingSimulationInput(
+                    smiles=["CCO", "c1ccccc1"],
+                    receptor_name="1abc",
+                    output_dir="/tmp/my_docking_run",
+                )
+            )
+            # result["scores"]    -> {"CCO": -5.3, "c1ccccc1": -6.1}
+            # result["dlg_files"] -> ["/tmp/my_docking_run/abc123.dlg", ...]
+            # result["output_dir"]-> "/tmp/my_docking_run"
+            ```
+        """
+        if server_settings.docking_oracle != "autodock_gpu":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "run_docking_simulation is only available when the server is "
+                    "configured to use AutoDock-GPU "
+                    "(docking_oracle == 'autodock_gpu'). "
+                    f"Current oracle: '{server_settings.docking_oracle}'."
+                ),
+            )
+
+        # Validate receptor name.
+        with open(server_settings.data_path + "/pockets_info.json") as f:
+            pockets_info: Dict[str, Any] = json.load(f)
+
+        if input.receptor_name not in pockets_info:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Receptor '{input.receptor_name}' is not a known docking target. "
+                    "Use get_available_docking_targets to list valid receptors."
+                ),
+            )
+
+        # Ensure the receptor has been prepared (Meeko + AutoGrid4).
+        if app.state.receptor_processor is not None:
+            app.state.receptor_processor.process_receptors(
+                [input.receptor_name], allow_bad_res=True
+            )
+
+        # Resolve / create the persistent output directory.
+        output_dir = input.output_dir
+        if output_dir is None:
+            output_dir = os.path.join("docking_outputs", input.receptor_name)
+        output_dir = os.path.abspath(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Remember which .dlg files already exist in the directory so we can
+        # return only the ones produced by *this* docking run.
+        pre_existing_dlg = (
+            {f for f in os.listdir(output_dir) if f.endswith(".dlg")}
+            if os.path.isdir(output_dir)
+            else set()
+        )
+
+        # Build the docking oracle for the requested receptor.
+        oracle = DockingMoleculeGpuOracle(
+            path_to_data=server_settings.data_path,
+            receptor_name=input.receptor_name,
+            vina_mode=server_settings.vina_mode,
+            exhaustiveness=server_settings.scorer_exhaustiveness,
+            n_cpu=server_settings.scorer_ncpus,
+        )
+
+        # Run docking and persist .dlg files.
+        docking_output = oracle.docking_module_gpu.dock_and_save(
+            input.smiles,
+            output_dlg_dir=output_dir,
+            gpu_ids=input.gpu_ids,
+        )
+
+        if docking_output is None:
+            raise HTTPException(
+                status_code=500,
+                detail="Docking failed to produce any output for the provided SMILES.",
+            )
+
+        scores_list, _ = docking_output
+
+        # Build a SMILES → score mapping.
+        scores: Dict[str, Any] = {
+            smi: score for smi, score in zip(input.smiles, scores_list)
+        }
+
+        # Collect only the .dlg files produced by this docking run.
+        dlg_files = sorted(
+            os.path.join(output_dir, f)
+            for f in os.listdir(output_dir)
+            if f.endswith(".dlg") and f not in pre_existing_dlg
+        )
+
+        return {
+            "scores": scores,
+            "dlg_files": dlg_files,
+            "output_dir": output_dir,
+        }

@@ -227,8 +227,22 @@ class BaseDocking:
         return ligand_paths_by_smiles, ligand_dir
 
     def _batched_docking(
-        self, smis: List[str], gpu_ids: List[int] = [0]
+        self,
+        smis: List[str],
+        gpu_ids: List[int] = [0],
+        output_dlg_dir: Optional[str] = None,
     ) -> VINA_DOCKING_OUTPUT:
+        """Execute a batched docking run.
+
+        Parameters:
+            smis: List of canonicalized SMILES strings to dock.
+            gpu_ids: GPU device IDs to use.
+            output_dlg_dir: When provided, every file produced in the internal
+                temporary output directory is **copied** to this path before
+                cleanup.  The directory is created if it does not exist.  Pass
+                ``None`` (the default) to keep the original behaviour where all
+                output files are discarded after scores have been extracted.
+        """
         # make temp pdbqt directories.
         ligand_tempdir = TemporaryDirectory(suffix="_lig")
         output_tempdir = TemporaryDirectory(suffix="_out")
@@ -252,6 +266,15 @@ class BaseDocking:
             gpu_ids=gpu_ids,
         )
 
+        # Save output files to a persistent directory if requested.
+        if output_dlg_dir is not None:
+            os.makedirs(output_dlg_dir, exist_ok=True)
+            for fname in os.listdir(output_dir_path):
+                shutil.copy(
+                    os.path.join(output_dir_path, fname),
+                    os.path.join(output_dlg_dir, fname),
+                )
+
         # clean up temp dirs
         ligand_tempdir.cleanup()
         output_tempdir.cleanup()
@@ -259,6 +282,45 @@ class BaseDocking:
             self.logger.info("Docking complete.")
 
         return output
+
+    def dock_and_save(
+        self,
+        smi: Union[str, List[str]],
+        output_dlg_dir: str,
+        gpu_ids: List[int] = [0],
+    ) -> VINA_DOCKING_OUTPUT:
+        """Run docking and save output files to a persistent directory.
+
+        Unlike the standard :meth:`__call__`, this method keeps the raw docking
+        output files (e.g. ``.dlg`` files produced by AutoDock-GPU) in
+        *output_dlg_dir* so that an AI agent can read and analyse them after
+        the call returns.
+
+        Parameters:
+            smi: A single SMILES string or a list of SMILES strings to dock.
+            output_dlg_dir: Destination directory for the output files.  The
+                directory is created automatically if it does not exist.
+            gpu_ids: GPU device IDs to use for docking (default: ``[0]``).
+
+        Returns:
+            Same ``VINA_DOCKING_OUTPUT`` tuple as :meth:`__call__`.
+        """
+        smi_list: List[str]
+        if isinstance(smi, str):
+            smi_list = [smi]
+        elif isinstance(smi, list):
+            for i in range(len(smi)):
+                mol = Chem.MolFromSmiles(smi[i])
+                if mol is not None:
+                    smi[i] = Chem.MolToSmiles(mol, isomericSmiles=True, canonical=True)
+            smi_list = smi
+        else:
+            raise Exception("smi must be a string or a list of strings")
+        if len(smi_list) > 0:
+            return self._batched_docking(
+                smi_list, gpu_ids=gpu_ids, output_dlg_dir=output_dlg_dir
+            )
+        return None
 
     def _batched_docking_run(
         self,
