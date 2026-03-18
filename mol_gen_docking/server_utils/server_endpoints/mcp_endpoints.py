@@ -308,3 +308,10 @@ def register_mcp_tools(
             }
 
         return output
+
+    @app.delete("/mcp", include_in_schema=False)  # type: ignore
+    async def delete_mcp() -> Dict[str, str]:
+        """Handle DELETE requests to /mcp endpoint.
+        This endpoint is typically called when a client disconnects or wants to clean up resources.
+        """
+        return {"status": "ok", "message": "MCP endpoint DELETE request handled"}
