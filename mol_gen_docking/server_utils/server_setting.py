@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -44,6 +45,8 @@ class MolecularVerifierServerSettings(BaseSettings):
 
         reaction_matrix_path (str): Path to the pickled reaction matrix file.
             Must exist and be accessible for reaction verification tasks.
+            **WARNING: Should be an absolute path to avoid issues when running in
+            different contexts (e.g., Docker containers).**
             Default: "data/rxn_matrix.pkl"
 
         docking_oracle (Literal["pyscreener", "autodock_gpu"]): The docking software
@@ -60,6 +63,8 @@ class MolecularVerifierServerSettings(BaseSettings):
             - names_mapping.json: Property name mappings
             - docking_targets.json: Target definitions for docking
             Used by generation tasks, and must be accessible.
+            **WARNING: Should be an absolute path to avoid issues when running in
+            different contexts (e.g., Docker containers, Ray clusters).**
             Default: "data/molgendata"
 
         buffer_time (int): Time in seconds to buffer requests before processing.
@@ -171,6 +176,27 @@ class MolecularVerifierServerSettings(BaseSettings):
         assert Path(self.reaction_matrix_path).exists(), (
             f"Reaction matrix file {self.reaction_matrix_path} does not exist"
         )
+
+        # Validate that paths are absolute
+        paths_to_check = [
+            ("reaction_matrix_path", self.reaction_matrix_path),
+            ("data_path", self.data_path),
+        ]
+        if self.ray_tmp_dir is not None:
+            paths_to_check.append(("ray_tmp_dir", self.ray_tmp_dir))
+
+        for path_name, path_value in paths_to_check:
+            path_obj = Path(path_value)
+            if not path_obj.is_absolute():
+                warnings.warn(
+                    f"'{path_name}' is a relative path: '{path_value}'. "
+                    f"This may cause issues when running in different contexts "
+                    f"(e.g., Docker containers, Ray clusters). "
+                    f"Consider using an absolute path instead. "
+                    f"Absolute path would be: '{path_obj.resolve()}'",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
     def to_molecular_verifier_config(
         self, reward: Literal["property", "valid_smiles"] = "property"
