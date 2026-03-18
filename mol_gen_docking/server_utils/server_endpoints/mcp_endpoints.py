@@ -225,7 +225,7 @@ def register_mcp_tools(
     ) -> BatchMolecularVerifierServerResponse:
         """
         Compute a reward value for a completion associated to a given prompt/metadata.
-        Handles molecular generation, property predicion and retrosynthesis planning.
+        Handles molecular generation, property prediction and retrosynthesis planning.
         Examples:
             ```python
             get_reward_mcp(
