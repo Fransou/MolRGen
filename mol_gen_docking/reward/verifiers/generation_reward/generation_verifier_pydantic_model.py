@@ -210,7 +210,7 @@ class GenerationVerifierMetadataModel(BaseModel):
             Each property corresponds to a molecular descriptor or docking target that was optimized.
 
         individual_rewards: List of individual rewards for each property in the properties list.
-            Each value is not necesseraly in [0.0, 1.0], representing
+            Each value is not necessarily in [0.0, 1.0], representing
             how well the molecule satisfies each property objective.
 
         all_smi_rewards: List of rewards for all SMILES found in the completion.
