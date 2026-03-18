@@ -119,7 +119,11 @@ def create_app() -> FastAPI:
         FastAPI: A configured FastAPI application instance.
     """
     app = FastAPI(lifespan=lifespan)
-    app.mount("/static", StaticFiles(directory="docs/docs/assets"), name="static")
+    app.mount(
+        "/static",
+        StaticFiles(directory="docs/docs/assets", check_dir=False),
+        name="static",
+    )
 
     @app.get("/favicon.ico", include_in_schema=False)  # type: ignore
     async def favicon() -> FileResponse:
