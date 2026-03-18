@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator
 
@@ -158,6 +159,10 @@ def create_mcp(app: FastAPI) -> FastApiMCP:
     Returns:
         FastApiMCP: A configured MCP server instance.
     """
+    # Ensure the env variable SERVER_MODE is batch, PARSING_METHOD is none
+    os.environ["SERVER_MODE"] = "batch"
+    os.environ["PARSING_METHOD"] = "none"
+
     register_mcp_tools(app, server_settings)
     mcp = FastApiMCP(
         app,
