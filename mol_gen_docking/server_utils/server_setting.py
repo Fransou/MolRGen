@@ -265,7 +265,5 @@ class MolecularVerifierServerSettings(BaseSettings):
             init_kwargs["address"] = self.ray_ip
             if self.ray_port is not None:
                 init_kwargs["address"] += f":{self.ray_port}"
-        else:
-            init_kwargs["address"] = "auto"
 
         ray.init(**init_kwargs)

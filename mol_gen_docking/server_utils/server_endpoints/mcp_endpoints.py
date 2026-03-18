@@ -206,7 +206,7 @@ def register_mcp_tools(
 
         The id of the target can then be furhter used to as a property name in compute_reward and get_properties.
         """
-        with open(server_settings.data_path + "/pockets_info.json") as f:
+        with open(server_settings.data_path + "/names_mapping.json") as f:
             pockets_info: Dict[str, str] = json.load(f)
         return pockets_info
 
