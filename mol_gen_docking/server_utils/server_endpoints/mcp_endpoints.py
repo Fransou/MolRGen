@@ -104,7 +104,7 @@ def register_mcp_tools(
         Example:
             ```python
             query = {
-                "query": "Generate a molecule with SMILES: <answer>CC(C)Cc1ccc(cc1)C(C)C(=O)O</answer>",
+                "query": "Generate a molecule with SMILES: <answer> ... </answer>",
                 "metadata": [
                     {
                         "properties": ["logP"],
@@ -214,6 +214,7 @@ def register_mcp_tools(
         "/get_reward_mcp",
         operation_id="compute_reward",
         response_model=BatchMolecularVerifierServerResponse,
+        include_in_schema=False,
     )  # type: ignore
     async def get_reward_mcp(
         query: MolecularVerifierServerQuery,
@@ -225,7 +226,7 @@ def register_mcp_tools(
             ```python
             get_reward_mcp(
                 query=MolecularVerifierServerQuery(
-                    query=["CC(C)Cc1ccc(cc1)C(C)C(=O)O"],
+                    query=[Molecular SMILES],
                     metadata=[
                         {
                             "properties": [<property to minimize>],

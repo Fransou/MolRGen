@@ -49,7 +49,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/build
-RUN git clone --depth 1 https://github.com/ccsb-scripps/AutoDock-GPU.git
+RUN git clone https://github.com/ccsb-scripps/AutoDock-GPU.git && \
+    git checkout v1.6
 
 ENV GPU_INCLUDE_PATH=/usr/local/cuda/include
 ENV GPU_LIBRARY_PATH=/usr/local/cuda/lib64
@@ -105,3 +106,11 @@ RUN echo '#!/bin/bash' > /usr/local/bin/docker-entrypoint.sh && \
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["/bin/bash"]
+{
+  "smiles": [
+    "CCCCC"
+  ],
+  "properties": [
+    "sample_347546_model_0"
+  ]
+}
