@@ -168,7 +168,7 @@ def create_mcp(app: FastAPI) -> FastApiMCP:
         app,
         name="Molecular Verifier Server",
         description="""
-    An MCP server that can be used to perform molecular generation / property prediction and retrosythesis planning tasks.
+    An MCP server that can be used to perform molecular generation / property prediction and retrosynthesis planning tasks.
 
     This server can notably be used to evaluate the quality of an answer (generated molecule, predicted property value, ...) based on the query.
     """,
