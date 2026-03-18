@@ -140,8 +140,12 @@ def register_mcp_tools(
                 raise TypeError(
                     f"Query must be a dict or MolecularVerifierServerQuery, got {type(query).__name__}"
                 )
-        except ValueError as e:
-            errors.append(f"Query validation failed: {str(e)}")
+        except (ValidationError, TypeError, ValueError) as e:
+            if isinstance(e, ValidationError):
+                # Include detailed Pydantic validation errors
+                errors.append(f"Query validation failed: {e.errors()}")
+            else:
+                errors.append(f"Query validation failed: {str(e)}")
             return {
                 "is_valid": False,
                 "task": task,
