@@ -6,7 +6,7 @@ temperature: 1.0
 save_prop: 1
 ### DATASET SPECIFIC CONFIGURATION
 best_of_n: 16
-rollout_batch_size: 25
+rollout_batch_size: 100
 iter: 0
 ### COMMON CONFIGURATION
 dataset: /scratch/fransou/MolGenData/molgendata/eval_data/eval_prompts_ood_boxed.jsonl
