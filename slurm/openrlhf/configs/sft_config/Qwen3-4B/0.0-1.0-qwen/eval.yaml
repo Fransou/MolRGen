@@ -18,4 +18,4 @@ apply_chat_template: true
 input_key: messages
 label_key: meta
 system_prompt: system_prompts/vanilla_boxed.json
-tp_size: 1
+tp_size: 4
