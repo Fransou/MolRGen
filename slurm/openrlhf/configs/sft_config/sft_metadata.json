@@ -1,6 +1,6 @@
 {
   "Qwen3-4B": {
     "time_per_100steps": 52,
-    "eval_time_per_ckpt": 15
+    "eval_time_per_ckpt": 18
   }
 }
