@@ -3,7 +3,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Tuple
 
 import numpy as np
 import pandas as pd
@@ -50,7 +50,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--model_name",
         type=str,
-        default="Franso/reinvent_171M_prior",
+        default="Franso/reinvent_10M_prior",
         help="Name of the model",
     )
     parser.add_argument(
@@ -205,7 +205,7 @@ def run_training(
         eval_strategy="steps",
         save_steps=10,
         eval_steps=10,
-        logging_steps=10,
+        logging_steps=1,
         learning_rate=args.learning_rate,
         lr_scheduler_type=args.lr_scheduler_type,
         warmup_steps=int(args.lr_warmup_ratio * args.num_train_epochs),
@@ -249,6 +249,30 @@ def run_training(
     trainer.train()
 
     return trainer
+
+
+def log_histories_to_dataframe(
+    trainer: ReinventGRPOTrainer,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Log training histories to a dataframe.
+    Separates training from eval logs
+
+    Args:
+        trainer: Trained ReinventGRPOTrainer instance
+
+    Returns:
+        A tuple of (training_history_df, eval_history_df) where each is a DataFrame containing the respective logs.
+    """
+
+    log_histories = trainer.state.log_history
+    training_history_df = [
+        log
+        for log in log_histories
+        if "train_loss" not in log and "eval_loss" not in log
+    ]
+    eval_history_df = [log for log in log_histories if "eval_loss" in log]
+    return pd.DataFrame(training_history_df), pd.DataFrame(eval_history_df)
 
 
 def run_final_generation(
@@ -310,6 +334,11 @@ def run_final_generation(
             )
 
     logger.info(f"Completed training and evaluation for task {task_id}")
+
+    logger.info(f"Saving training logs at {out_dir}")
+    training_history_df, eval_history_df = log_histories_to_dataframe(trainer)
+    training_history_df.to_csv(os.path.join(out_dir, "training_history.csv"))
+    eval_history_df.to_csv(os.path.join(out_dir, "eval_history.csv"))
 
 
 if __name__ == "__main__":

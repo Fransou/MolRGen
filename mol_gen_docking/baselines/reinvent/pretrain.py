@@ -19,7 +19,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_name",
         type=str,
-        default="Franso/reinvent_301K",
+        required=True,
         help="Name of the model",
     )
     parser.add_argument(
@@ -117,11 +117,11 @@ if __name__ == "__main__":
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         dataloader_num_workers=args.dataloader_num_workers,
-        packing=False,
+        packing=True,
         bf16=True,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         save_total_limit=3,
-        dataset_num_proc=32,
+        dataset_num_proc=8,
         dataloader_prefetch_factor=2,
     )
 
