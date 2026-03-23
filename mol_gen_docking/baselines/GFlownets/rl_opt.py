@@ -5,11 +5,11 @@ from typing import Any, Callable, Dict, List
 import numpy as np
 import pandas as pd
 import requests
-import wandb
 from datasets import load_from_disk
 from rdkit import Chem
 from tdc import Evaluator
 
+import wandb
 from mol_gen_docking.baselines.GFlownets.args import get_config
 from mol_gen_docking.baselines.GFlownets.trainer import MakeCustomTaskTrainer
 
@@ -100,7 +100,7 @@ if __name__ == "__main__":
                 project="GFlowNets-RL",
                 config=config.__dict__,
             )
-            wandb.config.update({"prompt": metadata})
+            wandb.config.update({"prompt": metadata})  # type: ignore
             trial = MakeCustomTaskTrainer(reward_fn, config, print_config=False)
             trial.run()
 

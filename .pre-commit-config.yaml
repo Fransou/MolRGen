@@ -36,7 +36,8 @@ repos:
     - id: mypy
       additional_dependencies: [
           "ray",
-           "pydantic>=2.0.0",  # Installe pydantic dans l'environnement de mypy
-           "types-requests"   # (Optionnel) exemple pour d'autres stubs
+           "pydantic>=2.0.0",
+           "types-requests",
+           "wandb"
       ]
       args: [ --ignore-missing-imports, --install-types, --non-interactive, --strict, --allow-subclassing-any ]

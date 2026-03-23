@@ -1,4 +1,5 @@
 import copy
+import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -15,6 +16,8 @@ from trl import GRPOTrainer
 from trl.trainer.utils import RepeatSampler, nanmax, nanmin, nanstd, pad
 
 N_REPEAT_TEST = 8
+
+logger = logging.getLogger(__name__)
 
 
 def get_reward_fn(
@@ -35,7 +38,7 @@ def get_reward_fn(
             json={"query": completions, "metadata": [metadata] * len(completions)},
         )
         assert response.status_code == 200, response.text
-        rewards: List[float] = response.json()["reward_list"]
+        rewards: List[float] = response.json().get("rewards", [0.0] * len(completions))
         if isinstance(completions, str):
             return rewards[0]
         return rewards
@@ -140,7 +143,7 @@ class ReinventGRPOTrainer(GRPOTrainer):
     ) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "train" if self.model.training else "eval"
         self.num_generations = self.training_num_generations if mode == "train" else 1
-
+        logger.debug(f"Number of inputs: {len(inputs)}")
         outputs: dict[str, Union[torch.Tensor, Any]] = (
             super()._generate_and_score_completions(inputs)
         )
