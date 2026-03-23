@@ -1,0 +1,21 @@
+# Configuration for MolGenData batch inference
+### MODEL SPECIFIC CONFIGURATION
+pretrain: /scratch/fransou/google/gemma-3-27b-it
+max_new_tokens: 16384
+top_p: 0.95
+temperature: 1.0
+output_path: /scratch/fransou/MolGenOutput/property_prediction/gemma-3-27b-it/out_{iter}
+### DATASET SPECIFIC CONFIGURATION
+best_of_n: 5
+rollout_batch_size: 5000
+### COMMON CONFIGURATION
+dataset: /scratch/fransou/MolGenData/property_prediction/eval_prompts_boxed.jsonl
+eval_task: generate_vllm
+max_len: 4096
+zero_stage: 3
+bf16: true
+apply_chat_template: true
+input_key: messages
+label_key: meta
+system_prompt: system_prompts/vanilla_boxed.json
+tp_size: 4
