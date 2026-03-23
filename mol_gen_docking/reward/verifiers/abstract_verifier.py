@@ -99,9 +99,10 @@ class Verifier:
         Returns:
             The extracted answer string.
         """
-        assert hasattr(self.verifier_config, "parsing_method"), (
-            "Verifier config must have a 'parsing_method' attribute."
-        )
+        if not hasattr(self.verifier_config, "parsing_method"):
+            raise AttributeError(
+                "Verifier config must have a 'parsing_method' attribute."
+            )
         if self.verifier_config.parsing_method == "none":
             # We just need to not match any special token (which we will assume to be in the format: <...>) so we
             # replace < and > by spaces
