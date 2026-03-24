@@ -4,11 +4,11 @@ from typing import Any, Callable, Dict, List
 
 import numpy as np
 import pandas as pd
+import wandb
 from datasets import load_from_disk
 from rdkit import Chem
 from tdc import Evaluator
 
-import wandb
 from mol_gen_docking.baselines.SynFlownets.args import get_config
 from mol_gen_docking.baselines.SynFlownets.trainer import MakeCustomTaskTrainer
 from mol_gen_docking.reward import (

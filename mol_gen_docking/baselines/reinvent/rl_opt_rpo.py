@@ -7,6 +7,7 @@ from typing import Callable, Tuple
 
 import numpy as np
 import pandas as pd
+import wandb
 from datasets import Dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -14,7 +15,6 @@ from transformers import (
 )
 from trl import GRPOConfig
 
-import wandb
 from mol_gen_docking.baselines.reinvent.trainers import (
     N_REPEAT_TEST,
     EvalMolMetrics,

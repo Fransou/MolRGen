@@ -3,7 +3,8 @@ from collections import Counter
 from typing import Generator, List
 
 from datasets import Dataset, load_dataset
-from tokenizers import Tokenizer, models, trainers
+from tokenizers import Regex, Tokenizer, decoders, models, pre_tokenizers, trainers
+from tqdm.auto import tqdm
 from transformers import (
     AutoTokenizer,
     PreTrainedTokenizerFast,
@@ -26,22 +27,24 @@ def create_reinvent_model(
     head_dim: int = 32,
 ) -> None:
     # Load dataset and train a new tokenizer
-    ds = load_dataset("jarod0411/zinc10M", split="train").select(range(10000))
+    ds = load_dataset("jarod0411/zinc10M", split="train").select(range(1000000))
     print("Dataset loaded of length: {}".format(len(ds)))
 
     # Use BPE model with CharLevel pre-tokenizer to avoid ByteLevelBPE's fixed 256 base tokens
     tokenizer = Tokenizer(models.BPE())
-    # tokenizer.pre_tokenizer = pre_tokenizers.CharLevel()
+    tokenizer.pre_tokenizer = pre_tokenizers.Split(Regex(r"\(|\)"), behavior="isolated")
 
     trainer = trainers.BpeTrainer(
         vocab_size=N_voc,
         min_frequency=2,
     )
     tokenizer.train_from_iterator(get_training_corpus(ds), trainer=trainer)
+    tokenizer.decoder = decoders.BPEDecoder()
 
     fast_tok = PreTrainedTokenizerFast(
         tokenizer_object=tokenizer,
         model_input_names=["input_ids", "attention_mask"],
+        clean_up_tokenization_spaces=False,
     )
     fast_tok.add_special_tokens({"pad_token": "<pad>"})
     fast_tok.add_special_tokens({"bos_token": "<s>"})
@@ -52,7 +55,7 @@ def create_reinvent_model(
     print("Computing token occurrences from training set...")
 
     token_counts: Counter[str] = Counter()
-    for row in ds:
+    for row in tqdm(ds.select(range(1000))):
         smiles = row["smiles"]
         tokenized = fast_tok(smiles)
         token_counts.update(tokenized["input_ids"])
@@ -83,7 +86,8 @@ def create_reinvent_model(
     for row in ds.select(range(10)):
         smiles = row["smiles"]
         tokenized = fast_tok("<s>" + smiles + "</s>")
-        print(smiles + " " * (30 - len(smiles)) + "->" + str(tokenized["input_ids"]))
+        de_tokenized = fast_tok.decode(tokenized["input_ids"])
+        print(smiles + "->" + str(tokenized["input_ids"]) + "->" + de_tokenized)
     print("#-#" * 20)
 
     config = Qwen3Config().__dict__
