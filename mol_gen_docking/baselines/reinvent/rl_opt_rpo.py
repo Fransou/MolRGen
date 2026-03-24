@@ -7,14 +7,17 @@ from typing import Callable, Tuple
 
 import numpy as np
 import pandas as pd
-import wandb
 from datasets import Dataset
+from rdkit import RDLogger
+from rdkit.Chem import MolFromSmiles
+from scipy.spatial.distance import squareform
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
 )
 from trl import GRPOConfig
 
+import wandb
 from mol_gen_docking.baselines.reinvent.trainers import (
     N_REPEAT_TEST,
     EvalMolMetrics,
@@ -22,6 +25,9 @@ from mol_gen_docking.baselines.reinvent.trainers import (
     get_reward_fn,
 )
 from mol_gen_docking.data.pydantic_dataset import read_jsonl
+from mol_gen_docking.evaluation.fingeprints_utils import get_sim_matrix
+
+RDLogger.DisableLog("rdApp.*")
 
 os.environ["WANDB_PROJECT"] = "REINVENT_HF-RL"
 
@@ -38,7 +44,13 @@ logger = logging.getLogger(__name__)
 
 
 def get_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="""
+        Adaptation of REINVENT with GRPO to generate molecules based on an optimization objective.
+
+        After training, all logs, generated molecules, and similarity matrix will be saved in the specified output directory.
+        """
+    )
     parser.add_argument(
         "--dataset",
         type=str,
@@ -50,7 +62,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--model_name",
         type=str,
-        default="Franso/reinvent_10M_prior",
+        default="Franso/Franso-reinvent_42M_64_prior",
         help="Name of the model",
     )
     parser.add_argument(
@@ -68,7 +80,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--learning_rate",
         type=float,
-        default=5e-4,
+        default=1e-5,
         help="Learning rate",
     )
     parser.add_argument(
@@ -116,24 +128,11 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--loss_type", type=str, default="dapo", choices=["grpo", "dr_grpo", "dapo"]
     )
-    parser.add_argument("--train_on_beams", type=int, default=0)
-    parser.add_argument(
-        "--num_beams",
-        type=int,
-        default=-1,
-    )
-    parser.add_argument(
-        "--generation_config",
-        type=json.loads,
-        default={},
-    )
-
     parser.add_argument(
         "--remote_rm_url",
         type=str,
         default="http://localhost:8000",
     )
-
     parser.add_argument(
         "--rewards_to_pick",
         type=str,  # Literal["docking_only", "std_only", "all"]
@@ -156,8 +155,15 @@ def get_args() -> argparse.Namespace:
         default=None,
         help="Path to JSON file containing custom metadata for reward definition",
     )
+    parser.add_argument(
+        "--smiles_start",
+        nargs="+",
+        type=str,
+        default=["<s>"],
+        help="Initial pattern for the generation. Can be the bos token, i.e <s>, or the bos token followed by the beginning of a SMILES string.",
+    )
+
     args = parser.parse_args()
-    args.train_on_beams = bool(args.train_on_beams)
     args.output_dir = os.path.join(
         args.output_dir, args.model_name.replace("/", "-") + "_rl"
     )
@@ -188,13 +194,6 @@ def run_training(
     """
     logger.info("Setting up training configuration...")
 
-    generation_config = {k: v for k, v in args.generation_config.items()}
-
-    if not args.train_on_beams:
-        generation_config["num_beams"] = 1
-        generation_config["num_beam_groups"] = 1
-        generation_config["penalty_alpha"] = None
-
     os.makedirs(out_dir, exist_ok=True)
 
     training_args = GRPOConfig(
@@ -222,7 +221,6 @@ def run_training(
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         save_total_limit=1,
         beta=args.sigma,
-        generation_kwargs=generation_config,
         batch_eval_metrics=False,
         log_completions=False,
         loss_type=args.loss_type,
@@ -231,8 +229,12 @@ def run_training(
         load_best_model_at_end=True,
     )
 
-    train_dataset = Dataset.from_dict({"prompt": ["<s>"] * args.num_train_epochs})
-    eval_dataset = Dataset.from_dict({"prompt": ["<s>"] * args.eval_batch_size})
+    train_dataset = Dataset.from_dict(
+        {"prompt": args.smiles_start * args.num_train_epochs}
+    )
+    eval_dataset = Dataset.from_dict(
+        {"prompt": args.smiles_start * args.eval_batch_size}
+    )
 
     trainer = ReinventGRPOTrainer(
         model=model,
@@ -303,7 +305,7 @@ def run_final_generation(
     if args.eval_batch_size > 0:
         trainer.compute_metrics = None
         final_gen_dataset = Dataset.from_dict(
-            {"prompt": ["<s>"] * args.eval_batch_size}
+            {"prompt": args.smiles_start * args.eval_batch_size}
         )
         output = trainer.predict(final_gen_dataset)
         logger.debug(f"Raw prediction output: {output}")
@@ -332,6 +334,17 @@ def run_final_generation(
             logger.info(
                 f"  {i}. SMILES: {smiles_predicted[idx]} | Reward: {rewards[idx]:.4f}"
             )
+    ### Get the similarity matrix between compounds
+    smiles = [
+        smiles_predicted[idx]
+        for idx in sorted_indices
+        if MolFromSmiles(smiles_predicted[idx]) is not None
+    ]
+    sim_mat = squareform(get_sim_matrix([MolFromSmiles(s) for s in smiles]))
+    sim_mat = sim_mat + np.eye(len(sim_mat))
+    df_sim = pd.DataFrame(columns=smiles, index=smiles, data=sim_mat)
+    logger.info(f"Saving similarity matrix to {out_dir}")
+    df_sim.to_csv(os.path.join(out_dir, "sim_matrix.csv"))
 
     logger.info(f"Completed training and evaluation for task {task_id}")
 
@@ -343,12 +356,6 @@ def run_final_generation(
 
 if __name__ == "__main__":
     args = get_args()
-    if args.num_beams >= 0:
-        if args.num_beams == 0:
-            args.generation_config = {}
-        else:
-            args.generation_config["num_beams"] = args.num_beams
-
     # Handle custom metadata or use dataset
     if args.custom_metadata:
         # Use custom metadata directly
@@ -387,10 +394,13 @@ if __name__ == "__main__":
 
         if args.id_obj == -1 or args.id_obj == id:
             reward_fn = get_reward_fn(metadata, args.datasets_path, args.remote_rm_url)
+            logger.info(f"Fetching model {args.model_name}")
             model = AutoModelForCausalLM.from_pretrained(args.model_name)
             tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-            args.generation_config["do_sample"] = True
             out_dir = os.path.join(args.output_dir, f"task_{id}")
+            logger.info(
+                f"Starting training for task {id} with output directory {out_dir}"
+            )
             trainer = run_training(
                 metadata=metadata,
                 args=args,

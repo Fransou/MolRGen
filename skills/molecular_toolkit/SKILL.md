@@ -81,19 +81,70 @@ targets = get_available_docking_targets()
 
 ### `MolRGen_get_properties`
 
-Compute specific molecular properties for one or more SMILES strings.
+Compute properties for one or more SMILES strings.
 
 **Arguments:**
-- `smiles`: A list of SMILES strings to evaluate.
-- `properties`: A list of property names to compute (e.g., ["QED", "logP", "SA"]).
+- `smiles`: List of SMILES strings to evaluate.
+- `properties`: List of property names to compute (for example
+    ``["QED", "logP", "SA"]``).
 
 **Returns:**
-A dictionary where keys are SMILES strings and values are dictionaries mapping property names to their computed values.
+Dict[str, Dict[str, float]]: A dictionary where keys are SMILES strings and values are dictionaries mapping property names to their computed values.
 
 **Example Usage:**
 ```python
 result = get_properties(
     smiles=["CCO", "c1ccccc1"],
-    properties=["QED", "logP", "SA"]
+    properties=["QED", "logP"]
 )
 ```
+
+### `MolRGen_train_reinvent_generator`
+
+Train a REINVENT model with custom metadata for reward definition.
+
+This endpoint runs the training synchronously and returns only after completion.
+
+**Arguments:**
+- `output_dir`: Output directory for model checkpoints (default: "./results")
+- `num_train_epochs`: Number of training epochs (default: 10)
+- `eval_batch_size`: Batch size for evaluation (default: 64)
+- `batch_size`: Batch size for training (default: 64)
+- `sigma`: Sigma parameter for REINVENT (default: 0.1)
+- `learning_rate`: Learning rate for REINVENT (default: 1e-5)
+- `smiles_start`: Beginning of sequence to start with (default: ["<s>"])
+- `metadata`: Metadata defining the reward function and objectives (GenerationVerifierInputMetadataModel with properties, objectives, and target values)
+
+**Returns:**
+Dict[str, Any]: Response including:
+    - `status`: 'completed' or 'failed'
+    - `job_id`: Unique identifier for the training job
+    - `message`: Status message
+    - `output`: Training output
+    - `timestamp`: Completion timestamp
+
+**Example Usage:**
+```python
+from mol_gen_docking.reward.verifiers.generation_reward.input_metadata import GenerationVerifierInputMetadataModel
+
+metadata = GenerationVerifierInputMetadataModel(
+    properties=["QED", "SA"],
+    objectives=["maximize", "minimize"],
+    target=[0.8, 0.5]
+)
+
+params = ReinventTrainingParams(
+    metadata=metadata,
+    num_train_epochs=50,
+    batch_size=64
+)
+result = train_reinvent_generator(params)
+```
+
+## Typical Molecular Generation Workflow
+
+Typically, if tasked to generate molecules with specific properties, you would follow these steps:
+1. **Find the corresponding objectives** Use `get_available_rdkit_properties` to find the RDKit properties, and `get_available_docking_targets` to find the docking targets that correspond to the desired objectives. Then formulate the query for the `MolecularVerifierServerQuery` accordingly, and validate it with `MolRGen_validate_query`.
+2. **Train a REINVENT model** Use `MolRGen_train_reinvent_generator` to train a model with the validated query metadata. The training runs synchronously and waits for completion.
+3. **Analyze results** Once the training is complete, analyze the generated molecules and their properties to ensure they meet the desired criteria.
+4. **Iterate** If necessary, refine the query and repeat the process to further optimize the generated molecules for the specific task. You can notably run a second REINVENT training job while enforcing the beginning of the SMILES string to start with the best molecule from the previous training job, to further optimize it.
