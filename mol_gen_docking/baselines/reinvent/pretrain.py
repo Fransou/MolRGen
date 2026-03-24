@@ -110,8 +110,8 @@ if __name__ == "__main__":
         example["text"] = bos_token + example["text"]
         return example
 
-    train_dataset = train_dataset.map(add_bos)
-    eval_dataset = eval_dataset.map(add_bos)
+    train_dataset = train_dataset.map(add_bos, num_proc=8)
+    eval_dataset = eval_dataset.map(add_bos, num_proc=8)
 
     training_args = SFTConfig(
         output_dir=args.output_dir,
@@ -120,8 +120,8 @@ if __name__ == "__main__":
         eval_strategy="steps",
         save_strategy="steps",
         logging_strategy="steps",
-        save_steps=250,
-        eval_steps=250,
+        save_steps=1000,
+        eval_steps=1000,
         logging_steps=10,
         learning_rate=args.learning_rate,
         lr_scheduler_type=args.lr_scheduler_type,
@@ -159,5 +159,9 @@ if __name__ == "__main__":
     tuned_model = trainer.model
 
     if args.push_to_hub:
-        tuned_model.push_to_hub(args.model_name + "_prior")
-        tokenizer.push_to_hub(args.model_name + "_prior")
+        if not args.model_name.endswith("_prior"):
+            hub_path = args.model_name + "_prior"
+        else:
+            hub_path = args.model_name
+        tuned_model.push_to_hub(hub_path)
+        tokenizer.push_to_hub(hub_path)

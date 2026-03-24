@@ -93,8 +93,7 @@ class MolecularVerifierServerSettings(BaseSettings):
             Default: None
 
         ray_ip (Optional[str]): Optional IP address of the Ray cluster head node.
-            Used to connect to an existing Ray cluster. If None and ray_port is also None,
-            Ray will be initialized locally with address="auto".
+            Used to connect to an existing Ray cluster. If None and ray_port is also None.
             Default: None
 
         ray_port (Optional[int]): Optional port number for the Ray cluster head node.

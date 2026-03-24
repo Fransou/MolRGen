@@ -3,7 +3,7 @@ import re
 
 def process_model_name(model_name: str) -> str:
     return (
-        re.sub(r"-\d+(B|b)", "", model_name[:-1])
+        re.sub(r"-\d+(B|b)", "", model_name)
         .replace("-2507", "")
         .replace("-A3B", "")
         .replace("-Distill", "")

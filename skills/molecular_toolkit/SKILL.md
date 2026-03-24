@@ -17,83 +17,25 @@ allowed-tools:
 
 ## When to use this skill
 Use the `molecular_toolkit` skill when you need to perform tasks related to molecular generation, property calculation, or docking target identification. This skill provides a set of tools that can assist in various stages of molecular design and analysis.
-With this skill you have enough chemical knowledge to understand the basics of chemistry and molecular modeling, and you can hence generate molecules, compute their properties, and perform multiple DMTA cycles (Design-Make-Test-Analyze) to optimize molecules for specific tasks.
 
 ## Available Tools through the MolRGen MCP Server
 
-### `MolRGen_validate_query`
+For detailed documentation on each tool, see the followiing reference files if necessary:
 
-Validate a `MolecularVerifierServerQuery` for a specific task type. This tool ensures that a query is properly formatted and contains the necessary information for the specified task type.
+- **[Validate Query Tool](references/validate_query.md)** - Query validation for molecular tasks
+- **[Get Properties](references/get_properties.md)** - Compute properties for SMILES strings
+- **[Training Tools](references/training.md)** - REINVENT model training and status monitoring
+- **[Display Molecule Tool](references/display_molecule.md)** - 2D ASCII art visualization of molecules
 
-**Arguments:**
-- `query`: A `MolecularVerifierServerQuery` object or dictionary representation of the query to validate.
-- `task`: The type of task to validate for. Options are:
-  - "molecular_generation": Validates for molecule generation tasks
-  - "property_prediction": Validates for property prediction tasks
-  - "molecular_reaction": Validates for reaction planning tasks
+The [properties](assets/properties.json) file contains a comprehensive list of molecular properties that can be computed using the `get_properties` tool, along with their descriptions and units.
+Do not directly open it as it is a large file, but you can search for specific properties within it.
 
-**Returns:**
-A validation result dictionary containing:
-- "is_valid": bool indicating whether the query is valid
-- "task": The task type that was validated
-- "errors": List of error messages if validation failed
-- "validated_query": The validated query object if valid
+## Typical Molecular Generation Workflow
 
-**Example Usage:**
-```python
-query = {
-    "query": "Molecular SMILES",
-    "metadata": [
-        {
-            "properties": ["logP"],
-            "objectives": ["minimize"],
-            "target": [0.0]
-        }
-    ]
-}
-result = validate_query(query=query, task="molecular_generation")
-```
-
-### `MolRGen_get_available_rdkit_properties`
-
-Get a list of all available RDKit properties for molecular generation. returns the RDKit property function names that can be evaluated by the molecular verifier.
-
-**Returns:**
-A sorted list of available RDKit property names (e.g., "SA", "QED", "CalcExactMolWt", "logP").
-
-**Example Usage:**
-```python
-properties = get_available_rdkit_properties()
-```
-
-### `MolRGen_get_available_docking_targets`
-
-Get a list of available docking targets (receptors) for molecular generation. These targets can be used for docking simulations and property calculations.
-
-**Returns:**
-A dictionary mapping textual descriptions of the targets to their corresponding IDs.
-
-**Example Usage:**
-```python
-targets = get_available_docking_targets()
-```
-
-
-### `MolRGen_get_properties`
-
-Compute specific molecular properties for one or more SMILES strings.
-
-**Arguments:**
-- `smiles`: A list of SMILES strings to evaluate.
-- `properties`: A list of property names to compute (e.g., ["QED", "logP", "SA"]).
-
-**Returns:**
-A dictionary where keys are SMILES strings and values are dictionaries mapping property names to their computed values.
-
-**Example Usage:**
-```python
-result = get_properties(
-    smiles=["CCO", "c1ccccc1"],
-    properties=["QED", "logP", "SA"]
-)
-```
+Typically, if tasked to generate molecules with specific properties, you would follow these steps:
+1. **Find the corresponding objectives** for your task in the [properties](assets/properties.json) file.
+2. **Start REINVENT training** Use `MolRGen_train_reinvent_generator` to start training a model with the validated query metadata. Note that reinvent training can take several minutes to run, depending on the parameters, especially when paired with docking-based objectives.
+3. **Monitor training status** Use `MolRGen_get_training_status` to check the progress of your training job periodically (eg,every 30s).
+4. **Analyze results** Once the training status shows 'completed', analyze the training's output files (generated molecules and training stats).
+5. **Iterate** If necessary, refine the query and repeat the process to further optimize the generated molecules for the specific task. You can notably run a second REINVENT training job while enforcing the beginning of the SMILES string to start with.
+6. **Visualize top molecules** Use `MolRGen_display_molecule` to display the 8 molecules with the highest score to the user along with their property values.
