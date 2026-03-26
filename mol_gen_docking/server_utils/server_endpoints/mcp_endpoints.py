@@ -7,12 +7,14 @@ interface for external clients to interact with the molecular verifier functiona
 import asyncio
 import json
 import subprocess
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from openbabel import pybel
 from pydantic import BaseModel, Field, ValidationError
 
 from mol_gen_docking.reward.verifiers import (
@@ -48,7 +50,7 @@ class ReinventTrainingParams(BaseModel):
     sigma: float = Field(default=0.1, description="Sigma parameter for REINVENT")
     learning_rate: float = Field(default=1e-5, description="Learning rate for REINVENT")
     smiles_start: List[str] = Field(
-        default_factory=lambda: ["<s>"],
+        default_factory=list,
         description="Beginning of sequence to start with",
     )
     metadata: GenerationVerifierInputMetadataModel = Field(
@@ -492,18 +494,18 @@ def register_mcp_tools(
         """
         Train a REINVENT model with custom metadata for reward definition.
 
-        This endpoint runs the training synchronously and returns only after completion.
+        This endpoint starts the training asynchronously and returns immediately with a job_id.
+        Use the /get_training_status endpoint to check the job status.
 
         Args:
             params: Training parameters including model configuration and metadata
 
         Returns:
             Dict[str, Any]: Response including:
-                - status: 'completed' or 'failed'
+                - status: 'started'
                 - job_id: Unique identifier for the training job
                 - message: Status message
-                - output: Training output
-                - timestamp: Completion timestamp
+                - timestamp: Start timestamp
 
         Example:
             ```python
@@ -522,11 +524,98 @@ def register_mcp_tools(
                 batch_size=64
             )
             result = await train_reinvent_generator(params)
+            job_id = result["job_id"]
+
+            # Check status later
+            status = await get_training_status(job_id)
             ```
         """
         job_id = str(uuid.uuid4())
-        result = await app.state.reinvent_training_service.train(params, job_id)
-        return result  # type: ignore
+        # Start training asynchronously without waiting for completion
+        asyncio.create_task(app.state.reinvent_training_service.train(params, job_id))
+
+        # Initialize job status
+        app.state.reinvent_training_service.job_status[job_id] = {
+            "status": "started",
+            "start_time": datetime.now().isoformat(),
+            "job_id": job_id,
+            "message": "REINVENT training started",
+        }
+
+        return {
+            "status": "started",
+            "job_id": job_id,
+            "message": "REINVENT training started",
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    @app.post(
+        "/get_training_status/{job_id}",
+        operation_id="get_training_status",
+        response_model=Dict[str, Any],
+    )  # type: ignore
+    async def get_training_status(
+        job_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Get the status of a REINVENT training job.
+
+        Args:
+            job_id: The job identifier returned by train_reinvent_generator
+
+        Returns:
+            Dict[str, Any]: Job status information including:
+                - status: 'started', 'running', 'completed', or 'failed'
+                - job_id: The job identifier
+                - message: Status message
+                - start_time: When the job was started
+                - end_time: When the job completed (if finished)
+                - output: Training output (if available)
+                - command: Command being executed (if running)
+
+        Example:
+            ```python
+            status = await get_training_status("abc123-def456")
+            print(status["status"])  # "running", "completed", "failed", etc.
+            ```
+        """
+        time.sleep(10)  # to avoid overloading the server
+        job_status: None | Dict[str, Any] = (
+            app.state.reinvent_training_service.job_status.get(job_id)
+        )
+
+        if job_status is None:
+            return {
+                "status": "not_found",
+                "job_id": job_id,
+                "message": f"Job {job_id} not found",
+                "timestamp": datetime.now().isoformat(),
+            }
+
+        return job_status
+
+    @app.post("/display_molecule/{smiles}", operation_id="display_molecule")  # type: ignore
+    async def display_molecule(smiles: str) -> str:
+        """
+        Uses Open Babel to generate a 2D ASCII art depiction of a molecule
+        from a SMILES string.
+        Args:
+            smiles: SMILES string to generate a 2D ASCII art
+
+        Returns:
+            A string containing the ASCII art representation of the molecule.
+        """
+        try:
+            mol = pybel.readstring("smi", smiles)
+            mol.make2D()
+            ascii_drawing = mol.write("ascii")
+            return f"Visual structure for SMILES: {smiles}\n\n```text\n{ascii_drawing}\n```"
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not process SMILES '{smiles}'. Error: {str(e)}",
+            )
 
     @app.delete("/mcp", include_in_schema=False)  # type: ignore
     async def delete_mcp() -> Dict[str, str]:

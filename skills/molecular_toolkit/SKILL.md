@@ -17,7 +17,6 @@ allowed-tools:
 
 ## When to use this skill
 Use the `molecular_toolkit` skill when you need to perform tasks related to molecular generation, property calculation, or docking target identification. This skill provides a set of tools that can assist in various stages of molecular design and analysis.
-With this skill you have enough chemical knowledge to understand the basics of chemistry and molecular modeling, and you can hence generate molecules, compute their properties, and perform multiple DMTA cycles (Design-Make-Test-Analyze) to optimize molecules for specific tasks.
 
 ## Available Tools through the MolRGen MCP Server
 
@@ -103,7 +102,7 @@ result = get_properties(
 
 Train a REINVENT model with custom metadata for reward definition.
 
-This endpoint runs the training synchronously and returns only after completion.
+This endpoint starts the training asynchronously and returns immediately with a job_id. Use `MolRGen_get_training_status` to check the job status and progress.
 
 **Arguments:**
 - `output_dir`: Output directory for model checkpoints (default: "./results")
@@ -112,16 +111,15 @@ This endpoint runs the training synchronously and returns only after completion.
 - `batch_size`: Batch size for training (default: 64)
 - `sigma`: Sigma parameter for REINVENT (default: 0.1)
 - `learning_rate`: Learning rate for REINVENT (default: 1e-5)
-- `smiles_start`: Beginning of sequence to start with (default: ["<s>"])
+- `smiles_start`: Beginning of sequence to start with (default: \["\<s\>"\])
 - `metadata`: Metadata defining the reward function and objectives (GenerationVerifierInputMetadataModel with properties, objectives, and target values)
 
 **Returns:**
 Dict[str, Any]: Response including:
-    - `status`: 'completed' or 'failed'
+    - `status`: 'started' (training has begun asynchronously)
     - `job_id`: Unique identifier for the training job
     - `message`: Status message
-    - `output`: Training output
-    - `timestamp`: Completion timestamp
+    - `timestamp`: Start timestamp
 
 **Example Usage:**
 ```python
@@ -139,12 +137,68 @@ params = ReinventTrainingParams(
     batch_size=64
 )
 result = train_reinvent_generator(params)
+job_id = result["job_id"]
+
+# Check training status later
+status = get_training_status(job_id)
+print(f"Training status: {status['status']}")
+```
+
+### `MolRGen_get_training_status`
+
+Get the status of a REINVENT training job started with `MolRGen_train_reinvent_generator`.
+If the status is running, it might take a few minutes to complete the job.
+
+**Arguments:**
+- `job_id`: The job identifier returned by `train_reinvent_generator`
+
+**Returns:**
+Dict[str, Any]: Job status information including:
+    - `status`: 'started', 'running', 'completed', or 'failed'
+    - `job_id`: The job identifier
+    - `message`: Status message
+    - `start_time`: When the job was started
+    - `end_time`: When the job completed (if finished)
+    - `output`: Training output (if available)
+    - `command`: Command being executed (if running)
+
+**Example Usage:**
+```python
+# Start training
+result = train_reinvent_generator(params)
+job_id = result["job_id"]
+
+# Check status
+status = get_training_status(job_id)
+print(f"Status: {status['status']}")
+if status['status'] == 'completed':
+    print(f"Output: {status['output']}")
+```
+
+### `MolRGen_display_molecule`
+
+Generate a 2D ASCII art depiction of a molecule from a SMILES string using Open Babel.
+
+**Arguments:**
+- `smiles`: SMILES string to generate a 2D ASCII art representation
+
+**Returns:**
+A string containing the ASCII art representation of the molecule.
+
+**Example Usage:**
+```python
+ascii_art = display_molecule("CCO")
+print(ascii_art)
 ```
 
 ## Typical Molecular Generation Workflow
 
 Typically, if tasked to generate molecules with specific properties, you would follow these steps:
 1. **Find the corresponding objectives** Use `get_available_rdkit_properties` to find the RDKit properties, and `get_available_docking_targets` to find the docking targets that correspond to the desired objectives. Then formulate the query for the `MolecularVerifierServerQuery` accordingly, and validate it with `MolRGen_validate_query`.
-2. **Train a REINVENT model** Use `MolRGen_train_reinvent_generator` to train a model with the validated query metadata. The training runs synchronously and waits for completion.
-3. **Analyze results** Once the training is complete, analyze the generated molecules and their properties to ensure they meet the desired criteria.
-4. **Iterate** If necessary, refine the query and repeat the process to further optimize the generated molecules for the specific task. You can notably run a second REINVENT training job while enforcing the beginning of the SMILES string to start with the best molecule from the previous training job, to further optimize it.
+2. **Start REINVENT training** Use `MolRGen_train_reinvent_generator` to start training a model with the validated query metadata. The training runs asynchronously, so you can continue with other tasks while it progresses.
+3. **Monitor training status** Use `MolRGen_get_training_status` to check the progress of your training job periodically. You can poll this endpoint periodically to monitor when the training completes.
+4. **Analyze results** Once the training status shows 'completed', analyze the generated molecules and their properties to ensure they meet the desired criteria.
+5. **Iterate** If necessary, refine the query and repeat the process to further optimize the generated molecules for the specific task. You can notably run a second REINVENT training job while enforcing the beginning of the SMILES string to start with the best molecule from the previous training job, to further optimize it.
+6. **Visualize top molecules** Use `MolRGen_display_molecule` to display the 8 best molecules along with their scores in the CLI. This helps in visually assessing the generated structures.
+
+Note that reinvent training can take several minutes to run, depending on the parameters, especially when paired with docking-based objectives.
