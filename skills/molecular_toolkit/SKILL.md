@@ -20,19 +20,18 @@ Use the `molecular_toolkit` skill when you need to perform tasks related to mole
 
 ## Available Tools through the MolRGen MCP Server
 
-For detailed documentation on each tool, see the reference files:
+For detailed documentation on each tool, see the followiing reference files if necessary:
 
 - **[Validate Query Tool](references/validate_query.md)** - Query validation for molecular tasks
-- **[Get Available RDKit Properties](references/get_available_rdkit_properties.md)** - List available RDKit properties
 - **[Get Properties](references/get_properties.md)** - Compute properties for SMILES strings
-- **[Docking Targets Tool](references/docking_targets.md)** - Available docking targets
 - **[Training Tools](references/training.md)** - REINVENT model training and status monitoring
 - **[Display Molecule Tool](references/display_molecule.md)** - 2D ASCII art visualization of molecules
+
 
 ## Typical Molecular Generation Workflow
 
 Typically, if tasked to generate molecules with specific properties, you would follow these steps:
-1. **Find the corresponding objectives** Use `get_available_rdkit_properties` to find the RDKit properties, and `get_available_docking_targets` to find the docking targets that correspond to the desired objectives.
+1. **Find the corresponding objectives** for your task in the [properties](assets/properties.json) file (do not directly read the whole file, but rather search for a particular key in it).
 2. **Start REINVENT training** Use `MolRGen_train_reinvent_generator` to start training a model with the validated query metadata. Note that reinvent training can take several minutes to run, depending on the parameters, especially when paired with docking-based objectives.
 3. **Monitor training status** Use `MolRGen_get_training_status` to check the progress of your training job periodically (eg,every 30s).
 4. **Analyze results** Once the training status shows 'completed', analyze the training's output files (generated molecules and training stats).

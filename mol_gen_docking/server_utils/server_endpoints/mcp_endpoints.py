@@ -31,7 +31,6 @@ from mol_gen_docking.server_utils.utils import (
     MolecularVerifierServerQuery,
 )
 from mol_gen_docking.utils.property_utils import (
-    CLASSICAL_PROPERTIES_NAMES,
     inverse_rescale_property_values,
 )
 
@@ -343,45 +342,6 @@ def register_mcp_tools(
             if validated_query
             else None,
         }
-
-    @app.get(
-        "/get_available_rdkit_properties", operation_id="get_available_rdkit_properties"
-    )  # type: ignore
-    def get_available_properties() -> List[str]:
-        """
-        Get a list of all available RDKit properties for molecular generation.
-
-        Returns the RDKit property function names (values from CLASSICAL_PROPERTIES_NAMES)
-        that can be evaluated by the molecular verifier.
-
-        Returns:
-            List[str]: A sorted list of available RDKit property names.
-                Examples include: "SA", "QED", "CalcExactMolWt", "CalcNumRotatableBonds", etc.
-
-        Example:
-            ```python
-            properties = get_available_properties()
-            print(properties)
-            # Output: ['CalcExactMolWt', 'CalcFractionCSP3', 'CalcHallKierAlpha',
-            #          'CalcNumAromaticRings', 'CalcNumHBA', 'CalcNumHBD',
-            #          'CalcNumRotatableBonds', 'CalcPhi', 'CalcTPSA', 'QED', 'SA', 'logP']
-            ```
-        """
-        return sorted(CLASSICAL_PROPERTIES_NAMES.values())
-
-    @app.get(
-        "/get_available_docking_targets", operation_id="get_available_docking_targets"
-    )  # type: ignore
-    def get_docking_targets() -> Dict[str, str]:
-        """
-        Get a list of available docking targets (receptors) for molecular generation.
-        Returns a dictionary of:  textual description of the target: id of the target.
-
-        The id of the target can then be furhter used to as a property name in compute_reward and get_properties.
-        """
-        with open(server_settings.data_path + "/names_mapping.json") as f:
-            pockets_info: Dict[str, str] = json.load(f)
-        return pockets_info
 
     @app.post(
         "/get_reward_mcp",
