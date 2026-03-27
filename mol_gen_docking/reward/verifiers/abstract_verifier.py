@@ -108,7 +108,11 @@ class Verifier:
             # replace < and > by spaces
             return self.parse_none(completion)
         elif self.verifier_config.parsing_method == "answer_tags":
-            return self.parse_answer_tags(completion)
+            tags = self.parse_answer_tags(completion)
+            boxed = self.parse_boxed(completion)
+            if boxed != "":
+                return boxed
+            return tags
         elif self.verifier_config.parsing_method == "boxed":
             return self.parse_boxed(completion)
         raise ValueError(
