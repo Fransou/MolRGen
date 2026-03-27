@@ -4,7 +4,7 @@ pretrain: /scratch/fransou/OpenDFM/ChemDFM-R-14B
 max_new_tokens: 16384
 top_p: 0.95
 temperature: 0.9
-output_path: /scratch/fransou/MolGenOutput/property_prediction/gemma-3-27b-it/out_{iter}
+output_path: /scratch/fransou/MolGenOutput/property_prediction/ChemDFM-R-14B/out_{iter}
 ### DATASET SPECIFIC CONFIGURATION
 best_of_n: 5
 rollout_batch_size: 5000
