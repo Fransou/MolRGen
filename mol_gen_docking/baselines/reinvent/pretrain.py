@@ -159,5 +159,9 @@ if __name__ == "__main__":
     tuned_model = trainer.model
 
     if args.push_to_hub:
-        tuned_model.push_to_hub(args.model_name + "_prior")
-        tokenizer.push_to_hub(args.model_name + "_prior")
+        if not args.model_name.endswith("_prior"):
+            hub_path = args.model_name + "_prior"
+        else:
+            hub_path = args.model_name
+        tuned_model.push_to_hub(hub_path)
+        tokenizer.push_to_hub(hub_path)

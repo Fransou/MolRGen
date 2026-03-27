@@ -43,7 +43,7 @@ model = [
     "vllm==0.10.1.1",
     "pytdc==1.1.14",
     "transformers==4.57.3",
-    "trl==0.24.0",
+    "trl==0.29.0",
     "wandb",
     "peft==0.15.2",
     "flash_attn==2.8.0.post2"
