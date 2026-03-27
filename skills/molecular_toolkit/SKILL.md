@@ -34,7 +34,7 @@ For detailed documentation on each tool, see the reference files:
 Typically, if tasked to generate molecules with specific properties, you would follow these steps:
 1. **Find the corresponding objectives** Use `get_available_rdkit_properties` to find the RDKit properties, and `get_available_docking_targets` to find the docking targets that correspond to the desired objectives.
 2. **Start REINVENT training** Use `MolRGen_train_reinvent_generator` to start training a model with the validated query metadata. Note that reinvent training can take several minutes to run, depending on the parameters, especially when paired with docking-based objectives.
-3. **Monitor training status** Use `MolRGen_get_training_status` to check the progress of your training job periodically.
+3. **Monitor training status** Use `MolRGen_get_training_status` to check the progress of your training job periodically (eg,every 30s).
 4. **Analyze results** Once the training status shows 'completed', analyze the training's output files (generated molecules and training stats).
 5. **Iterate** If necessary, refine the query and repeat the process to further optimize the generated molecules for the specific task. You can notably run a second REINVENT training job while enforcing the beginning of the SMILES string to start with.
 6. **Visualize top molecules** Use `MolRGen_display_molecule` to display the 8 molecules with the highest score to the user along with their property values.
