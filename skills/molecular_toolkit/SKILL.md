@@ -27,11 +27,13 @@ For detailed documentation on each tool, see the followiing reference files if n
 - **[Training Tools](references/training.md)** - REINVENT model training and status monitoring
 - **[Display Molecule Tool](references/display_molecule.md)** - 2D ASCII art visualization of molecules
 
+The [properties](assets/properties.json) file contains a comprehensive list of molecular properties that can be computed using the `get_properties` tool, along with their descriptions and units.
+Do not directly open it as it is a large file, but you can search for specific properties within it.
 
 ## Typical Molecular Generation Workflow
 
 Typically, if tasked to generate molecules with specific properties, you would follow these steps:
-1. **Find the corresponding objectives** for your task in the [properties](assets/properties.json) file (do not directly read the whole file, but rather search for a particular key in it).
+1. **Find the corresponding objectives** for your task in the [properties](assets/properties.json) file.
 2. **Start REINVENT training** Use `MolRGen_train_reinvent_generator` to start training a model with the validated query metadata. Note that reinvent training can take several minutes to run, depending on the parameters, especially when paired with docking-based objectives.
 3. **Monitor training status** Use `MolRGen_get_training_status` to check the progress of your training job periodically (eg,every 30s).
 4. **Analyze results** Once the training status shows 'completed', analyze the training's output files (generated molecules and training stats).
