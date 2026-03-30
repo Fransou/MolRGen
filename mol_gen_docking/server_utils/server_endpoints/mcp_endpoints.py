@@ -43,10 +43,10 @@ class ReinventTrainingParams(BaseModel):
     output_dir: str = Field(
         default="./results", description="Output directory for model checkpoints"
     )
-    num_train_epochs: int = Field(default=10, description="Number of training epochs")
+    num_train_epochs: int = Field(default=20, description="Number of training epochs")
     eval_batch_size: int = Field(default=64, description="Batch size for evaluation")
-    batch_size: int = Field(default=64, description="Batch size for training")
-    sigma: float = Field(default=0.1, description="Sigma parameter for REINVENT")
+    batch_size: int = Field(default=256, description="Batch size for training")
+    sigma: float = Field(default=0.4, description="Sigma parameter for REINVENT")
     learning_rate: float = Field(default=1e-5, description="Learning rate for REINVENT")
     smiles_start: List[str] = Field(
         default_factory=list,
@@ -158,7 +158,6 @@ class ReinventTrainingService:
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
-                cwd="/home/philippe/MolGenDocking",
             )
             output_lines = []
             if process.stdout:
@@ -539,7 +538,7 @@ def register_mcp_tools(
             print(status["status"])  # "running", "completed", "failed", etc.
             ```
         """
-        time.sleep(10)  # to avoid overloading the server
+        time.sleep(2)  # to avoid overloading the server
         job_status: None | Dict[str, Any] = (
             app.state.reinvent_training_service.job_status.get(job_id)
         )

@@ -305,7 +305,8 @@ class GenerationVerifier(Verifier):
             for p in all_properties
         }
 
-        values_job = []
+        values_job = []  # Get property jobs
+        key_res = []  # Corresponding keys - maps each batch to (prop, smiles_batch)
         for p in all_properties:
             # If the reward is long to compute, use ray
             smiles = prop_smiles[p]
@@ -313,24 +314,26 @@ class GenerationVerifier(Verifier):
                 _get_property_remote = _get_property_long
             else:
                 _get_property_remote = _get_property_fast
-
-            values_job.append(
-                _get_property_remote.remote(
-                    smiles,
-                    p,
-                    rescale=self.verifier_config.rescale,
-                    kwargs=self.verifier_config.oracle_kwargs.model_dump(),
+            for i_smi in range(0, len(smiles), 4):  # Process smiles by batches of 4
+                smiles_batch = smiles[i_smi : min(len(smiles), i_smi + 4)]
+                values_job.append(
+                    _get_property_remote.remote(
+                        smiles_batch,
+                        p,
+                        rescale=self.verifier_config.rescale,
+                        kwargs=self.verifier_config.oracle_kwargs.model_dump(),
+                    )
                 )
-            )
+                # Store the mapping for this batch: (prop, [smiles_in_batch])
+                key_res.append((p, smiles_batch))
         all_values = ray.get(values_job)
-        for idx_p, p in enumerate(all_properties):
-            values = all_values[idx_p]
-            smiles = prop_smiles[p]
-            for s, v in zip(smiles, values):
+        for (prop, smiles_batch), values_batch in zip(key_res, all_values):
+            for smi, value in zip(smiles_batch, values_batch):
                 df_properties.loc[
-                    (df_properties["smiles"] == s) & (df_properties["property"] == p),
+                    (df_properties["smiles"] == smi)
+                    & (df_properties["property"] == prop),
                     "value",
-                ] = v
+                ] = value
 
     def get_reward(self, row: pd.Series) -> float:
         """Compute reward for a single property-molecule pair.

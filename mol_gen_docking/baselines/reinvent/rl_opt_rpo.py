@@ -167,6 +167,9 @@ def get_args() -> argparse.Namespace:
     args.output_dir = os.path.join(
         args.output_dir, args.model_name.replace("/", "-") + "_rl"
     )
+    args.smiles_start = [
+        smi if smi.startswith("<s>") else "<s>" + smi for smi in args.smiles_start
+    ]
     return args
 
 

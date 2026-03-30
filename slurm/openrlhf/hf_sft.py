@@ -24,6 +24,8 @@ from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
+from mol_gen_docking.data.pydantic_dataset import read_jsonl
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -45,27 +47,14 @@ def load_jsonl_dataset(path: str, input_key: str = "messages") -> Dataset:
     Lines that cannot be parsed, or that do not contain the expected key, are
     skipped with a warning.
     """
-    import json
+    samples = read_jsonl(Path(path))
 
     records = []
-    with open(path, encoding="utf-8") as fh:
-        for lineno, raw in enumerate(fh, start=1):
-            raw = raw.strip()
-            if not raw:
-                continue
-            try:
-                obj = json.loads(raw)
-            except json.JSONDecodeError as exc:
-                logger.warning("Skipping line %d — JSON parse error: %s", lineno, exc)
-                continue
-
-            if input_key not in obj:
-                logger.warning(
-                    "Skipping line %d — key '%s' not found.", lineno, input_key
-                )
-                continue
-
-            records.append({input_key: obj[input_key]})
+    for sample in samples:
+        for conversation in sample.conversations:
+            # Extract messages from the conversation
+            messages = [msg.model_dump() for msg in conversation.messages]
+            records.append({input_key: messages})
 
     if not records:
         raise ValueError(f"No valid records found in dataset '{path}'.")
@@ -188,7 +177,7 @@ def main() -> None:
     if apply_chat_template:
         # Convert the list-of-dicts conversation to a plain string via the
         # tokenizer's chat template so that SFTTrainer receives a text column.
-        def format_example(example):
+        def format_example(example: dict) -> dict:
             try:
                 text = tokenizer.apply_chat_template(
                     example[input_key],
@@ -204,10 +193,12 @@ def main() -> None:
                 text = ""
             return {"text": text}
 
-        dataset = raw_dataset.map(format_example, remove_columns=raw_dataset.column_names)
+        dataset = raw_dataset.map(
+            format_example, remove_columns=raw_dataset.column_names
+        )
     else:
         # Assume the field already contains a formatted string, or join content fields.
-        def join_content(example):
+        def join_content(example: dict) -> dict:
             messages = example[input_key]
             text = "\n".join(m.get("content", "") for m in messages)
             return {"text": text}
@@ -220,16 +211,7 @@ def main() -> None:
     logger.info("Loading model from '%s' …", pretrain)
     model_kwargs = dict(trust_remote_code=True)
     if flash_attn:
-        try:
-            import flash_attn  # noqa: F401
-        except ImportError as exc:
-            raise ImportError(
-                "flash_attn is enabled in the config but the 'flash-attn' package is "
-                "not installed or incompatible with the current hardware. "
-                "Install it with:  pip install flash-attn  "
-                "(requires an NVIDIA GPU with CUDA support)"
-            ) from exc
-        model_kwargs["attn_implementation"] = "flash_attention_2"
+        model_kwargs["attn_implementation"] = "flash_attention_2"  # type: ignore
     if bf16:
         model_kwargs["torch_dtype"] = torch.bfloat16
 
@@ -264,7 +246,7 @@ def main() -> None:
         save_steps=save_steps,
         save_total_limit=max_ckpt_num,
         report_to=report_to,
-        max_seq_length=max_len,
+        max_length=max_len,
         packing=packing_samples,
         dataset_text_field="text",
         remove_unused_columns=True,
@@ -277,7 +259,6 @@ def main() -> None:
         model=model,
         args=sft_config,
         train_dataset=dataset,
-        tokenizer=tokenizer,
     )
 
     logger.info("Starting SFT training …")

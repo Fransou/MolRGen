@@ -9,11 +9,13 @@ import torch.utils.data
 from accelerate.utils import gather_object
 from datasets import Dataset
 from rdkit import Chem
-from tdc import Evaluator
+from scipy.spatial.distance import squareform
 from torch.utils.data import Sampler
 from transformers import AutoTokenizer, EvalPrediction
 from trl import GRPOTrainer
 from trl.trainer.utils import RepeatSampler, nanmax, nanmin, nanstd, pad
+
+from mol_gen_docking.evaluation.fingeprints_utils import get_sim_matrix
 
 N_REPEAT_TEST = 8
 
@@ -46,6 +48,37 @@ def get_reward_fn(
     return reward_fn
 
 
+class MolGenerationEvaluator:
+    def __init__(self, qsim: float = 0.05):
+        """
+        Evaluator class measuring the validity, uniqueness and diversity of a set of smiles.
+        Args:
+            qsim: Quantile taken for the diversity measure
+        """
+        self.qsim = qsim
+        self.keys = [
+            "Validity",
+            "Uniqueness",
+            "Diversity",
+        ]
+
+    def __call__(self, smiles: List[str]) -> Dict[str, float]:
+        mols = [Chem.MolFromSmiles(smi) for smi in smiles]
+        valid_mols = [m for m in mols if m is not None]
+
+        out: Dict[str, float] = {}
+        out["Validity"] = len(valid_mols) / len(mols) if len(mols) > 0 else 0.0
+
+        sim_mat = squareform(get_sim_matrix(mols=valid_mols))
+        M = np.tri(sim_mat.shape[0], sim_mat.shape[0], k=-1, dtype=int).T
+        out["Uniqueness"] = (
+            (((sim_mat == 1.0).astype(int)) @ M).diagonal() == 0
+        ).mean()
+        out["Diversity"] = 1 - np.quantile(sim_mat, q=1 - self.qsim, axis=1).mean()
+
+        return out
+
+
 class EvalMolMetrics:
     def __init__(
         self,
@@ -54,14 +87,11 @@ class EvalMolMetrics:
     ):
         self.tokenizer = tokenizer
         self.reward_fn = reward_fn
-        self.mol_evaluators = {
-            name: Evaluator(name=name)
-            for name in ["Validity", "Uniqueness", "Diversity"]
-        }
+        self.mol_evaluator = MolGenerationEvaluator()
 
     def __call__(self, preds: EvalPrediction) -> Dict[str, float]:
         metrics_sub: Dict[str, List[float]] = {
-            eval_name: [] for eval_name in self.mol_evaluators.keys()
+            eval_name: [] for eval_name in self.mol_evaluator.keys
         }
         metrics_sub["reward"] = []
         n = len(preds.label_ids)
@@ -72,10 +102,9 @@ class EvalMolMetrics:
             completions_text = self.tokenizer.batch_decode(
                 sub_label_ids, skip_special_tokens=True
             )
-            for eval_name in self.mol_evaluators:
-                metrics_sub[eval_name].append(
-                    self.mol_evaluators[eval_name](completions_text)
-                )
+            mol_eval_out = self.mol_evaluator(completions_text)
+            for eval_name in mol_eval_out:
+                metrics_sub[eval_name].append(mol_eval_out[eval_name])
 
             # for the reward, we remove duplicates and keep the top-n after this processing
             mols = [Chem.MolFromSmiles(smi) for smi in completions_text]
@@ -103,25 +132,13 @@ class ReinventGRPOTrainer(GRPOTrainer):
         self, compute_metrics: Any, n_repeat_test: int, *args: Any, **kwargs: Any
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.mol_evaluators = {
-            name: Evaluator(name=name)
-            for name in ["Validity", "Uniqueness", "Diversity"]
-        }
+        self.mol_evaluator = MolGenerationEvaluator()
         self.compute_metrics = compute_metrics
         self.n_repeat_test = n_repeat_test
         self.training_num_generations: int = copy.deepcopy(self.num_generations)
 
     def _get_eval_sampler(self, eval_dataset: Dataset) -> Sampler:
-        # See _get_train_sampler for an explanation of the sampler.
-        n_generations = len(eval_dataset) // self.n_repeat_test
-        assert (
-            n_generations % self.generation_config.num_beams == 0
-            or self.generation_config.num_beams % n_generations == 0
-        )
-        # Modify generation_config to generate n_generation completions
-        self.generation_config.num_return_sequences = min(
-            n_generations, self.generation_config.num_beams
-        )
+        self.generation_config.num_return_sequences = 1
         return RepeatSampler(
             data_source=eval_dataset,
             mini_repeat_count=1,
@@ -143,17 +160,15 @@ class ReinventGRPOTrainer(GRPOTrainer):
     ) -> dict[str, Union[torch.Tensor, Any]]:
         mode = "train" if self.model.training else "eval"
         self.num_generations = self.training_num_generations if mode == "train" else 1
-        logger.debug(f"Number of inputs: {len(inputs)}")
         outputs: dict[str, Union[torch.Tensor, Any]] = (
             super()._generate_and_score_completions(inputs)
         )
 
         completions_text = list(self._logs["completion"])  # Trick get all completions
         ### MOLECULE SPECIFIC METRICS ###
-        for eval_name in self.mol_evaluators:
-            self._metrics[mode][eval_name].append(
-                self.mol_evaluators[eval_name](completions_text)
-            )
+        mol_eval_out = self.mol_evaluator(completions_text)
+        for eval_name in mol_eval_out:
+            self._metrics[mode][eval_name].append(mol_eval_out[eval_name])
         self.num_generations = self.training_num_generations
         return outputs
 
@@ -163,10 +178,7 @@ class VanillaReinventTrainer(ReinventGRPOTrainer):
         self, compute_metrics: Any, n_repeat_test: int, *args: Any, **kwargs: Any
     ) -> None:
         super().__init__(compute_metrics, n_repeat_test, *args, **kwargs)
-        self.mol_evaluators = {
-            name: Evaluator(name=name)
-            for name in ["Validity", "Uniqueness", "Diversity"]
-        }
+        self.mol_evaluator = MolGenerationEvaluator()
         self.compute_metrics = compute_metrics
         self.n_repeat_test = n_repeat_test
 
@@ -372,10 +384,9 @@ class VanillaReinventTrainer(ReinventGRPOTrainer):
 
         completions = completions_text
         ### MOLECULE SPECIFIC METRICS ###
-        for eval_name in self.mol_evaluators:
-            self._metrics[mode][eval_name].append(
-                self.mol_evaluators[eval_name](completions_text)
-            )
+        mol_eval_out = self.mol_evaluator(completions_text)
+        for eval_name in mol_eval_out:
+            self._metrics[mode][eval_name].append(mol_eval_out[eval_name])
         # Calculate rewards for each reward function. rewards_per_func aggregates rewards across all processes. This is
         # important because rewards will be normalized per group, and completions are distributed. We will later slice
         # rewards_per_func to extract each process's subset.
