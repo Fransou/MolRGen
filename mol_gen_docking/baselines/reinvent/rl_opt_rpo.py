@@ -7,6 +7,7 @@ from typing import Callable, Tuple
 
 import numpy as np
 import pandas as pd
+import wandb
 from datasets import Dataset
 from rdkit import RDLogger
 from rdkit.Chem import MolFromSmiles
@@ -17,7 +18,6 @@ from transformers import (
 )
 from trl import GRPOConfig
 
-import wandb
 from mol_gen_docking.baselines.reinvent.trainers import (
     N_REPEAT_TEST,
     EvalMolMetrics,
@@ -62,7 +62,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--model_name",
         type=str,
-        default="Franso/Franso-reinvent_42M_64_prior",
+        default="Franso/Franso-reinvent_229M_256_prior",
         help="Name of the model",
     )
     parser.add_argument(
