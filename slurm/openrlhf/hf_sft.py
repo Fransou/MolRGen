@@ -41,11 +41,11 @@ def load_jsonl_dataset(path: str, input_key: str = "messages") -> Dataset:
     """Load a JSONL file into a HuggingFace Dataset.
 
     Each line must be a JSON object that contains a field whose name is given
-    by *input_key* (default: ``"messages"``).  The field value must be a list
+    by *input_key* (default: ``"messages"``). The field value must be a list
     of chat-message dicts (``[{"role": ..., "content": ...}, ...]``).
 
-    Lines that cannot be parsed, or that do not contain the expected key, are
-    skipped with a warning.
+    The input file must therefore contain well-formed JSON lines with the
+    expected structure; otherwise an exception will be raised during loading.
     """
     samples = read_jsonl(Path(path))
 
