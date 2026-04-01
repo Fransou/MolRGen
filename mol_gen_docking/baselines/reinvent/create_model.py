@@ -20,7 +20,6 @@ def get_training_corpus(dataset: Dataset) -> Generator[List[str], None, None]:
 
 
 def create_reinvent_model(
-    checkpoint: str,
     N_voc: int = 60,
     num_hidden_layers: int = 6,
     num_attention_heads: int = 24,
@@ -131,12 +130,6 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--checkpoint",
-        type=str,
-        default="Qwen/Qwen3-0.6B",
-        help="Base model checkpoint to start from",
-    )
-    parser.add_argument(
         "--vocab_size", type=int, default=48, help="Vocabulary size for the tokenizer"
     )
     parser.add_argument(
@@ -155,7 +148,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     create_reinvent_model(
-        checkpoint=args.checkpoint,
         N_voc=args.vocab_size,
         num_hidden_layers=args.num_hidden_layers,
         num_attention_heads=args.num_attention_heads,

@@ -68,13 +68,16 @@ class MolGenerationEvaluator:
 
         out: Dict[str, float] = {}
         out["Validity"] = len(valid_mols) / len(mols) if len(mols) > 0 else 0.0
-
-        sim_mat = squareform(get_sim_matrix(mols=valid_mols))
-        M = np.tri(sim_mat.shape[0], sim_mat.shape[0], k=-1, dtype=int).T
-        out["Uniqueness"] = (
-            (((sim_mat == 1.0).astype(int)) @ M).diagonal() == 0
-        ).mean()
-        out["Diversity"] = 1 - np.quantile(sim_mat, q=1 - self.qsim, axis=1).mean()
+        if len(valid_mols) < 2:
+            out["Uniqueness"] = 0.0
+            out["Diversity"] = 0.0
+        else:
+            sim_mat = squareform(get_sim_matrix(mols=valid_mols))
+            M = np.tri(sim_mat.shape[0], sim_mat.shape[0], k=-1, dtype=int).T
+            out["Uniqueness"] = (
+                (((sim_mat == 1.0).astype(int)) @ M).diagonal() == 0
+            ).mean()
+            out["Diversity"] = 1 - np.quantile(sim_mat, q=1 - self.qsim, axis=1).mean()
 
         return out
 

@@ -7,14 +7,12 @@ interface for external clients to interact with the molecular verifier functiona
 import asyncio
 import json
 import subprocess
-import time
 import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Literal
 
 from fastapi import FastAPI, HTTPException
-from openbabel import pybel
 from pydantic import BaseModel, Field, ValidationError
 
 from mol_gen_docking.reward.verifiers import (
@@ -33,6 +31,11 @@ from mol_gen_docking.server_utils.utils import (
 from mol_gen_docking.utils.property_utils import (
     inverse_rescale_property_values,
 )
+
+try:
+    from openbabel import pybel
+except ImportError:
+    pybel = None
 
 TaskType = Literal["molecular_generation", "property_prediction", "molecular_reaction"]
 
@@ -477,7 +480,6 @@ def register_mcp_tools(
             )
 
             params = ReinventTrainingParams(
-                model_name="Franso/reinvent_42M",
                 metadata=metadata,
                 num_train_epochs=50,
                 batch_size=64
@@ -538,7 +540,7 @@ def register_mcp_tools(
             print(status["status"])  # "running", "completed", "failed", etc.
             ```
         """
-        time.sleep(2)  # to avoid overloading the server
+        await asyncio.sleep(2)  # to avoid overloading the server
         job_status: None | Dict[str, Any] = (
             app.state.reinvent_training_service.job_status.get(job_id)
         )

@@ -330,8 +330,7 @@ def run_final_generation(
         results_df.to_csv(results_csv_path, index=False)
         logger.info(f"Saved generated molecules to {results_csv_path}")
 
-        # Log top 5 molecules
-        sorted_indices = np.argsort(rewards)
+        sorted_indices = np.argsort(rewards)[::-1]
         logger.info("Generated Molecules:")
         for i, idx in enumerate(sorted_indices, 1):
             logger.info(
