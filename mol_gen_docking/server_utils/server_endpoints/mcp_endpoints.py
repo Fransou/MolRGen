@@ -4,10 +4,15 @@ This module defines tools that can be exposed through the MCP (Model Context Pro
 interface for external clients to interact with the molecular verifier functionality.
 """
 
+import asyncio
 import json
+import subprocess
+import uuid
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, ValidationError
 
 from mol_gen_docking.reward.verifiers import (
@@ -24,11 +29,35 @@ from mol_gen_docking.server_utils.utils import (
     MolecularVerifierServerQuery,
 )
 from mol_gen_docking.utils.property_utils import (
-    CLASSICAL_PROPERTIES_NAMES,
     inverse_rescale_property_values,
 )
 
+try:
+    from openbabel import pybel
+except ImportError:
+    pybel = None
+
 TaskType = Literal["molecular_generation", "property_prediction", "molecular_reaction"]
+
+
+class ReinventTrainingParams(BaseModel):
+    """Parameters for REINVENT model training."""
+
+    output_dir: str = Field(
+        default="./results", description="Output directory for model checkpoints"
+    )
+    num_train_epochs: int = Field(default=20, description="Number of training epochs")
+    eval_batch_size: int = Field(default=64, description="Batch size for evaluation")
+    batch_size: int = Field(default=256, description="Batch size for training")
+    sigma: float = Field(default=0.4, description="Sigma parameter for REINVENT")
+    learning_rate: float = Field(default=1e-5, description="Learning rate for REINVENT")
+    smiles_start: List[str] = Field(
+        default_factory=list,
+        description="Beginning of sequence to start with",
+    )
+    metadata: GenerationVerifierInputMetadataModel = Field(
+        ..., description="Metadata defining the reward function and objectives"
+    )
 
 
 class CalcPropInput(BaseModel):
@@ -68,9 +97,150 @@ def _validate_metadata(
     return errors
 
 
+class ReinventTrainingService:
+    """Service for managing REINVENT training jobs."""
+
+    def __init__(self) -> None:
+        self.server_settings: MolecularVerifierServerSettings | None = None
+        self.job_status: Dict[str, Dict[str, Any]] = {}
+
+    def set_server_settings(
+        self, server_settings: MolecularVerifierServerSettings
+    ) -> None:
+        """Set server settings for the training service."""
+        self.server_settings = server_settings
+
+    async def train(
+        self, params: ReinventTrainingParams, job_id: str
+    ) -> Dict[str, Any]:
+        """Start REINVENT training as a background task."""
+        # Create a temporary file for custom metadata
+        metadata_file = Path(f"/tmp/reinvent_metadata_{job_id}.json")
+        with open(metadata_file, "w") as f:
+            json.dump(params.metadata.model_dump(), f)
+
+        if params.smiles_start == []:
+            params.smiles_start = ["<s>"]
+
+        # Build command line arguments
+        cmd = [
+            "python",
+            "-m",
+            "mol_gen_docking.baselines.reinvent.rl_opt_rpo",
+            "--custom_metadata_file",
+            str(metadata_file),
+            "--output_dir",
+            params.output_dir,
+            "--num_train_epochs",
+            str(params.num_train_epochs),
+            "--batch_size",
+            str(params.batch_size),
+            "--eval_batch_size",
+            str(params.eval_batch_size),
+            "--sigma",
+            str(params.sigma),
+            "--learning_rate",
+            str(params.learning_rate),
+            "--smiles_start",
+            *params.smiles_start,
+            "--remote_rm_url",
+            "http://localhost:8000",  # Default value - use localhost to avoid network issues
+        ]
+        print(" ".join(cmd))
+
+        # Update job status
+        if job_id:
+            self.job_status[job_id] = {
+                "status": "running",
+                "start_time": datetime.now().isoformat(),
+                "command": " ".join(cmd),
+            }
+        # Run the training process asynchronously
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            output_lines = []
+            if process.stdout:
+                while True:
+                    line = await process.stdout.readline()
+                    if not line:
+                        break
+                    line_str = line.decode().strip()
+                    print(line_str)
+                    output_lines.append(line_str)
+                    if job_id:
+                        self.job_status[job_id]["output"] = "".join(output_lines)
+            await process.wait()
+            returncode = process.returncode
+            assert returncode is not None, "returncode must not be None"
+            if returncode != 0:
+                raise subprocess.CalledProcessError(returncode, cmd, output=b"")
+            result_stdout = "".join(output_lines)
+            # Clean up metadata file
+            if metadata_file.exists():
+                metadata_file.unlink()
+            # Update job status
+            if job_id:
+                self.job_status[job_id] = {
+                    "status": "completed",
+                    "message": "REINVENT training completed successfully",
+                    "output": result_stdout,
+                    "end_time": datetime.now().isoformat(),
+                }
+            return {
+                "status": "completed",
+                "message": "REINVENT training completed successfully",
+                "output": result_stdout,
+                "timestamp": datetime.now().isoformat(),
+                "job_id": job_id,
+            }
+        except subprocess.CalledProcessError as e:
+            # Clean up metadata file
+            if metadata_file.exists():
+                metadata_file.unlink()
+            # Update job status
+            if job_id:
+                self.job_status[job_id] = {
+                    "status": "failed",
+                    "message": f"REINVENT training failed for job {job_id}",
+                    "output": e.output.decode() if e.output else str(e),
+                    "end_time": datetime.now().isoformat(),
+                }
+            print(
+                f"REINVENT training failed for job {job_id}: {e.output.decode() if e.output else str(e)}"
+            )
+            return {
+                "status": "failed",
+                "message": f"REINVENT training failed for job {job_id}",
+                "output": e.output.decode() if e.output else str(e),
+                "timestamp": datetime.now().isoformat(),
+                "job_id": job_id,
+            }
+        except Exception as e:
+            # Clean up metadata file
+            if metadata_file.exists():
+                metadata_file.unlink()
+            print(f"Failed to start REINVENT training for job {job_id}: {str(e)}")
+            return {
+                "status": "failed",
+                "message": f"Failed to start REINVENT training for job {job_id}",
+                "output": str(e),
+                "timestamp": datetime.now().isoformat(),
+                "job_id": job_id,
+            }
+
+
 def register_mcp_tools(
     app: FastAPI, server_settings: MolecularVerifierServerSettings
 ) -> None:
+    # Initialize REINVENT training service
+    if not hasattr(app.state, "reinvent_training_service"):
+        app.state.reinvent_training_service = ReinventTrainingService()
+        app.state.reinvent_training_service.set_server_settings(server_settings)
+
     @app.post("/validate_query/{task}", operation_id="validate_query")  # type: ignore
     def validate_query(
         query: MolecularVerifierServerQuery | Dict[str, Any],
@@ -175,45 +345,6 @@ def register_mcp_tools(
             else None,
         }
 
-    @app.get(
-        "/get_available_rdkit_properties", operation_id="get_available_rdkit_properties"
-    )  # type: ignore
-    def get_available_properties() -> List[str]:
-        """
-        Get a list of all available RDKit properties for molecular generation.
-
-        Returns the RDKit property function names (values from CLASSICAL_PROPERTIES_NAMES)
-        that can be evaluated by the molecular verifier.
-
-        Returns:
-            List[str]: A sorted list of available RDKit property names.
-                Examples include: "SA", "QED", "CalcExactMolWt", "CalcNumRotatableBonds", etc.
-
-        Example:
-            ```python
-            properties = get_available_properties()
-            print(properties)
-            # Output: ['CalcExactMolWt', 'CalcFractionCSP3', 'CalcHallKierAlpha',
-            #          'CalcNumAromaticRings', 'CalcNumHBA', 'CalcNumHBD',
-            #          'CalcNumRotatableBonds', 'CalcPhi', 'CalcTPSA', 'QED', 'SA', 'logP']
-            ```
-        """
-        return sorted(CLASSICAL_PROPERTIES_NAMES.values())
-
-    @app.get(
-        "/get_available_docking_targets", operation_id="get_available_docking_targets"
-    )  # type: ignore
-    def get_docking_targets() -> Dict[str, str]:
-        """
-        Get a list of available docking targets (receptors) for molecular generation.
-        Returns a dictionary of:  textual description of the target: id of the target.
-
-        The id of the target can then be furhter used to as a property name in compute_reward and get_properties.
-        """
-        with open(server_settings.data_path + "/names_mapping.json") as f:
-            pockets_info: Dict[str, str] = json.load(f)
-        return pockets_info
-
     @app.post(
         "/get_reward_mcp",
         operation_id="compute_reward",
@@ -313,6 +444,139 @@ def register_mcp_tools(
             }
 
         return output
+
+    @app.post(
+        "/train_reinvent_generator",
+        operation_id="train_reinvent_generator",
+        response_model=Dict[str, Any],
+    )  # type: ignore
+    async def train_reinvent_generator(
+        params: ReinventTrainingParams,
+    ) -> Dict[str, Any]:
+        """
+        Train a REINVENT model with custom metadata for reward definition.
+
+        This endpoint starts the training asynchronously and returns immediately with a job_id.
+        Use the /get_training_status endpoint to check the job status.
+
+        Args:
+            params: Training parameters including model configuration and metadata
+
+        Returns:
+            Dict[str, Any]: Response including:
+                - status: 'started'
+                - job_id: Unique identifier for the training job
+                - message: Status message
+                - timestamp: Start timestamp
+
+        Example:
+            ```python
+            from mol_gen_docking.reward.verifiers.generation_reward.input_metadata import GenerationVerifierInputMetadataModel
+
+            metadata = GenerationVerifierInputMetadataModel(
+                properties=["QED", "SA"],
+                objectives=["maximize", "minimize"],
+                target=[0.8, 0.5]
+            )
+
+            params = ReinventTrainingParams(
+                metadata=metadata,
+                num_train_epochs=50,
+                batch_size=64
+            )
+            result = await train_reinvent_generator(params)
+            job_id = result["job_id"]
+
+            # Check status later
+            status = await get_training_status(job_id)
+            ```
+        """
+        job_id = str(uuid.uuid4())
+        # Start training asynchronously without waiting for completion
+        asyncio.create_task(app.state.reinvent_training_service.train(params, job_id))
+
+        # Initialize job status
+        app.state.reinvent_training_service.job_status[job_id] = {
+            "status": "started",
+            "start_time": datetime.now().isoformat(),
+            "job_id": job_id,
+            "message": "REINVENT training started",
+        }
+
+        return {
+            "status": "started",
+            "job_id": job_id,
+            "message": "REINVENT training started",
+            "timestamp": datetime.now().isoformat(),
+        }
+
+    @app.post(
+        "/get_training_status/{job_id}",
+        operation_id="get_training_status",
+        response_model=Dict[str, Any],
+    )  # type: ignore
+    async def get_training_status(
+        job_id: str,
+    ) -> Dict[str, Any]:
+        """
+        Get the status of a REINVENT training job.
+
+        Args:
+            job_id: The job identifier returned by train_reinvent_generator
+
+        Returns:
+            Dict[str, Any]: Job status information including:
+                - status: 'started', 'running', 'completed', or 'failed'
+                - job_id: The job identifier
+                - message: Status message
+                - start_time: When the job was started
+                - end_time: When the job completed (if finished)
+                - output: Training output (if available)
+                - command: Command being executed (if running)
+
+        Example:
+            ```python
+            status = await get_training_status("abc123-def456")
+            print(status["status"])  # "running", "completed", "failed", etc.
+            ```
+        """
+        await asyncio.sleep(2)  # to avoid overloading the server
+        job_status: None | Dict[str, Any] = (
+            app.state.reinvent_training_service.job_status.get(job_id)
+        )
+
+        if job_status is None:
+            return {
+                "status": "not_found",
+                "job_id": job_id,
+                "message": f"Job {job_id} not found",
+                "timestamp": datetime.now().isoformat(),
+            }
+
+        return job_status
+
+    @app.post("/display_molecule/{smiles}", operation_id="display_molecule")  # type: ignore
+    async def display_molecule(smiles: str) -> str:
+        """
+        Uses Open Babel to generate a 2D ASCII art depiction of a molecule
+        from a SMILES string.
+        Args:
+            smiles: SMILES string to generate a 2D ASCII art
+
+        Returns:
+            A string containing the ASCII art representation of the molecule.
+        """
+        try:
+            mol = pybel.readstring("smi", smiles)
+            mol.make2D()
+            ascii_drawing = mol.write("ascii")
+            return f"Visual structure for SMILES: {smiles}\n\n```text\n{ascii_drawing}\n```"
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not process SMILES '{smiles}'. Error: {str(e)}",
+            )
 
     @app.delete("/mcp", include_in_schema=False)  # type: ignore
     async def delete_mcp() -> Dict[str, str]:

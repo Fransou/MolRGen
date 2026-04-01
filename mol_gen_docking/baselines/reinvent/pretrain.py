@@ -5,6 +5,7 @@ Pretraining simply corresponds to SFT
 import argparse
 import os
 
+import torch
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
@@ -19,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model_name",
         type=str,
-        default="Franso/reinvent_301K",
+        required=True,
         help="Name of the model",
     )
     parser.add_argument(
@@ -87,7 +88,9 @@ if __name__ == "__main__":
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Load model and tokenizer
-    model = AutoModelForCausalLM.from_pretrained(args.model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name, attn_implementation="flash_attention_2", dtype=torch.bfloat16
+    )
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
 
     # Load dataset
@@ -100,6 +103,16 @@ if __name__ == "__main__":
         else dataset["train"].select(range(1000))
     )
 
+    # Add bos token at the beginning of all rows
+    bos_token = tokenizer.bos_token
+
+    def add_bos(example: dict) -> dict:
+        example["text"] = bos_token + example["text"]
+        return example
+
+    train_dataset = train_dataset.map(add_bos, num_proc=8)
+    eval_dataset = eval_dataset.map(add_bos, num_proc=8)
+
     training_args = SFTConfig(
         output_dir=args.output_dir,
         run_name=args.output_dir,
@@ -107,8 +120,8 @@ if __name__ == "__main__":
         eval_strategy="steps",
         save_strategy="steps",
         logging_strategy="steps",
-        save_steps=500,
-        eval_steps=500,
+        save_steps=1000,
+        eval_steps=1000,
         logging_steps=10,
         learning_rate=args.learning_rate,
         lr_scheduler_type=args.lr_scheduler_type,
@@ -117,11 +130,12 @@ if __name__ == "__main__":
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         dataloader_num_workers=args.dataloader_num_workers,
-        packing=False,
+        packing=True,
+        max_length=512,
         bf16=True,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         save_total_limit=3,
-        dataset_num_proc=32,
+        dataset_num_proc=8,
         dataloader_prefetch_factor=2,
     )
 
@@ -133,10 +147,21 @@ if __name__ == "__main__":
         processing_class=tokenizer,
     )
 
+    # Display the 5 first rows of the trainer's train_dataset
+    print("Examples of sequences")
+    for i in range(5):
+        print(trainer.train_dataset[i])
+        input_ids = trainer.train_dataset[i]["input_ids"]
+        print(f"\tRow {i} | {tokenizer.decode(input_ids)}")
+
     trainer.train()
 
     tuned_model = trainer.model
 
     if args.push_to_hub:
-        tuned_model.push_to_hub(args.model_name + "_prior")
-        tokenizer.push_to_hub(args.model_name + "_prior")
+        if not args.model_name.endswith("_prior"):
+            hub_path = args.model_name + "_prior"
+        else:
+            hub_path = args.model_name
+        tuned_model.push_to_hub(hub_path)
+        tokenizer.push_to_hub(hub_path)

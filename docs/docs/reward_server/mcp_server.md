@@ -45,30 +45,6 @@ The server exposes several MCP tools for molecular verification:
 
     **Returns:** Validation result with is_valid flag, errors, and validated query.
 
--   :material-help-circle:{ .lg .middle } __Available RDKit Properties__
-
-    ---
-
-    **Tool:** `get_available_rdkit_properties`
-
-    **Endpoint:** `GET /get_available_rdkit_properties`
-
-    **Description:** Returns a list of all available RDKit properties that can be evaluated.
-
-    **Returns:** List of property names (e.g., "QED", "logP", "SA", "CalcExactMolWt").
-
--   :material-format-list-bulleted:{ .lg .middle } __Available Docking Targets__
-
-    ---
-
-    **Tool:** `get_available_docking_targets`
-
-    **Endpoint:** `GET /get_available_docking_targets`
-
-    **Description:** Returns available docking targets (receptors) for molecular generation.
-
-    **Returns:** Dictionary mapping target descriptions to target IDs.
-
 -   :material-code-braces:{ .lg .middle } __Reward Calculation__
 
     ---
@@ -101,6 +77,54 @@ The server exposes several MCP tools for molecular verification:
     - `properties`: List of property names to compute
 
     **Returns:** Dictionary mapping SMILES to property values.
+
+-   :material-robot:{ .lg .middle } __REINVENT Training__
+
+    ---
+
+    **Tool:** `train_reinvent_generator`
+
+    **Endpoint:** `POST /train_reinvent_generator`
+
+    **Description:** Train a REINVENT model with custom metadata for reward definition.
+
+    **Parameters:**
+
+    - `params`: Training parameters including model configuration and metadata
+
+    **Returns:** Response including status, job_id, message, and timestamp.
+
+-   :material-progress-check:{ .lg .middle } __Training Status__
+
+    ---
+
+    **Tool:** `get_training_status`
+
+    **Endpoint:** `POST /get_training_status/{job_id}`
+
+    **Description:** Get the status of a REINVENT training job.
+
+    **Parameters:**
+
+    - `job_id`: The job identifier returned by train_reinvent_generator
+
+    **Returns:** Job status information including status, timestamps, and output.
+
+-   :material-eye:{ .lg .middle } __Molecule Visualization__
+
+    ---
+
+    **Tool:** `display_molecule`
+
+    **Endpoint:** `POST /display_molecule/{smiles}`
+
+    **Description:** Generate a 2D ASCII art depiction of a molecule from a SMILES string.
+
+    **Parameters:**
+
+    - `smiles`: SMILES string to visualize
+
+    **Returns:** ASCII art representation of the molecule.
 
 </div>
 

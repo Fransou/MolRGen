@@ -100,7 +100,7 @@ if __name__ == "__main__":
             reward_fn = get_reward_fn(metadata, args.datasets_path)
             evaluator = EvalMolMetrics(reward_fn)
             wandb.init(project="SynFlowNets-RL", allow_val_change=True)
-            wandb.config.update({"prompt": metadata})
+            wandb.config.update({"prompt": metadata})  # type: ignore
             trial = MakeCustomTaskTrainer(reward_fn, config, print_config=False)
             trial.run()
 

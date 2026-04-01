@@ -225,7 +225,7 @@ if __name__ == "__main__":
                 n_repeat_test=N_REPEAT_TEST,
             )
             trainer.train()
-            wandb.config.update(
+            wandb.config.update(  # type: ignore
                 {
                     "id_obj": args.id_obj,
                     "objectives": metadata["objectives"],

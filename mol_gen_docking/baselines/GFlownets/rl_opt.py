@@ -100,7 +100,7 @@ if __name__ == "__main__":
                 project="GFlowNets-RL",
                 config=config.__dict__,
             )
-            wandb.config.update({"prompt": metadata})
+            wandb.config.update({"prompt": metadata})  # type: ignore
             trial = MakeCustomTaskTrainer(reward_fn, config, print_config=False)
             trial.run()
 

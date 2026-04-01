@@ -150,7 +150,7 @@ class DockingMoleculeGpuOracle:
                 timeout_duration=None,
                 debug=False,
                 print_msgs=self.print_msgs,
-                print_output=False,
+                print_output=True,
                 gpu_ids=gpu_ids,
                 docking_attempts=self.docking_attempts,
                 additional_args={
