@@ -30,6 +30,7 @@ cp data/properties.csv $SLURM_TMPDIR
 ray start --head --node-ip-address 0.0.0.0 --dashboard-port=$DASHBOARD_PORT
 ssh -N -f -R ${DASHBOARD_PORT}:localhost:${DASHBOARD_PORT} $SLURM_JOB_USER@rorqual4
 
+export PYTORCH_MULTIPROCESSING_START_METHOD=spawn
 
 #export DEBUG_MODE=1
 ray job submit \
