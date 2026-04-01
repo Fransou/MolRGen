@@ -2,10 +2,7 @@
 #SBATCH --job-name=batch_inference_molgen
 #SBATCH --account=def-ibenayed
 #SBATCH --time=00:00:00
-#SBATCH --gpus=h100:4
-#SBATCH --mem=248G
-#SBATCH --cpus-per-task=8
-#SBATCH --tasks-per-node=1
+#SBATCH --gpus-per-node=4
 #SBATCH --nodes=1
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
@@ -14,6 +11,9 @@
 DATASET=$1
 CONFIG=$2
 
+export RAY_TMPDIR=$SLURM_TMPDIR/ray
+mkdir -p $RAY_TMPDIR
+
 WORKING_DIR=$HOME/MolGenDocking
 export DASHBOARD_PORT=$((8001 + SLURM_ARRAY_TASK_ID))
 export DATA_PATH=$SLURM_TMPDIR/$DATASET
@@ -21,16 +21,26 @@ export DATA_PATH=$SLURM_TMPDIR/$DATASET
 source $HOME/.bashrc
 source $HOME/OpenRLHF/bin/activate
 
+ray stop || true
+
 cp $SCRATCH/MolGenData/$DATASET.tar.gz $SLURM_TMPDIR
 cd $SLURM_TMPDIR
 tar -xzf $DATASET.tar.gz
 cd $WORKING_DIR
 
 cp data/properties.csv $SLURM_TMPDIR
+
+export TRITON_CACHE_DIR=$SLURM_TMPDIR
+export XDG_CONFIG_HOME=$SLURM_TMPDIR
+export XDG_CACHE_HOME=$SLURM_TMPDIR
+export HF_HOME=$SLURM_TMPDIR
+export FLASHINFER_CACHE_DIR=$SLURM_TMPDIR/flashinfer_cache
+export FLASHINFER_CUBIN_DIR=$SLURM_TMPDIR/flashinfer_cubin
+
+
 ray start --head --node-ip-address 0.0.0.0 --dashboard-port=$DASHBOARD_PORT
 ssh -N -f -R ${DASHBOARD_PORT}:localhost:${DASHBOARD_PORT} $SLURM_JOB_USER@rorqual4
 
-export PYTORCH_MULTIPROCESSING_START_METHOD=spawn
 
 #export DEBUG_MODE=1
 ray job submit \
@@ -56,3 +66,5 @@ else
       --input_file $CONFIG \
       --batch_size 1024
 fi
+
+ray stop || true
