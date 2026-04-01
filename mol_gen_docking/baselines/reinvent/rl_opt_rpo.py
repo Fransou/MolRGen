@@ -337,18 +337,22 @@ def run_final_generation(
             logger.info(
                 f"  {i}. SMILES: {smiles_predicted[idx]} | Reward: {rewards[idx]:.4f}"
             )
-    ### Get the similarity matrix between compounds
-    smiles = [
-        smiles_predicted[idx]
-        for idx in sorted_indices
-        if MolFromSmiles(smiles_predicted[idx]) is not None
-    ]
-    sim_mat = squareform(get_sim_matrix([MolFromSmiles(s) for s in smiles]))
-    sim_mat = sim_mat + np.eye(len(sim_mat))
-    df_sim = pd.DataFrame(columns=smiles, index=smiles, data=sim_mat)
-    logger.info(f"Saving similarity matrix to {out_dir}")
-    df_sim.to_csv(os.path.join(out_dir, "sim_matrix.csv"))
 
+        # Get the similarity matrix between compounds
+        smiles = [
+            smiles_predicted[idx]
+            for idx in sorted_indices
+            if MolFromSmiles(smiles_predicted[idx]) is not None
+        ]
+        sim_mat = squareform(get_sim_matrix([MolFromSmiles(s) for s in smiles]))
+        sim_mat = sim_mat + np.eye(len(sim_mat))
+        df_sim = pd.DataFrame(columns=smiles, index=smiles, data=sim_mat)
+        logger.info(f"Saving similarity matrix to {out_dir}")
+        df_sim.to_csv(os.path.join(out_dir, "sim_matrix.csv"))
+    else:
+        logger.info(
+            "eval_batch_size <= 0: no molecules generated, skipping similarity matrix computation."
+        )
     logger.info(f"Completed training and evaluation for task {task_id}")
 
     logger.info(f"Saving training logs at {out_dir}")
