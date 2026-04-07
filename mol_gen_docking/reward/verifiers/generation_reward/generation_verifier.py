@@ -277,27 +277,12 @@ class GenerationVerifier(Verifier):
         scheduling_strategy = self.get_placement_group_strat()
         # Create remote functions with optional placement group scheduling
         if scheduling_strategy is not None:
-            _get_property_fast = ray.remote(
+            _get_property_remote = ray.remote(
                 num_cpus=0.5,
                 scheduling_strategy=scheduling_strategy,
             )(_get_property)
-            _get_property_long = ray.remote(
-                num_cpus=1,
-                num_gpus=float(
-                    "gpu" in self.verifier_config.oracle_kwargs.docking_oracle
-                )
-                / self.verifier_config.docking_concurrency_per_gpu,
-                scheduling_strategy=scheduling_strategy,
-            )(_get_property)
         else:
-            _get_property_fast = ray.remote(num_cpus=0.5)(_get_property)
-            _get_property_long = ray.remote(
-                num_cpus=1,
-                num_gpus=float(
-                    "gpu" in self.verifier_config.oracle_kwargs.docking_oracle
-                )
-                / self.verifier_config.docking_concurrency_per_gpu,
-            )(_get_property)
+            _get_property_remote = ray.remote(num_cpus=0.5)(_get_property)
 
         all_properties = df_properties["property"].unique().tolist()
         prop_smiles = {
@@ -306,29 +291,25 @@ class GenerationVerifier(Verifier):
         }
 
         values_job = []  # Get property jobs
-        key_res = []  # Corresponding keys - maps each batch to (prop, smiles_batch)
         for p in all_properties:
             # If the reward is long to compute, use ray
             smiles = prop_smiles[p]
-            if p in self.slow_props:
-                _get_property_remote = _get_property_long
-            else:
-                _get_property_remote = _get_property_fast
-            for i_smi in range(0, len(smiles), 4):  # Process smiles by batches of 4
-                smiles_batch = smiles[i_smi : min(len(smiles), i_smi + 4)]
-                values_job.append(
-                    _get_property_remote.remote(
-                        smiles_batch,
-                        p,
-                        rescale=self.verifier_config.rescale,
-                        kwargs=self.verifier_config.oracle_kwargs.model_dump(),
-                    )
+            oracle_kwargs = self.verifier_config.oracle_kwargs.model_dump()
+            oracle_kwargs["docking_concurrency_per_gpu"] = (
+                self.verifier_config.docking_concurrency_per_gpu
+            )
+            values_job.append(
+                _get_property_remote.remote(
+                    smiles,
+                    p,
+                    rescale=self.verifier_config.rescale,
+                    kwargs=oracle_kwargs,
                 )
-                # Store the mapping for this batch: (prop, [smiles_in_batch])
-                key_res.append((p, smiles_batch))
+            )
         all_values = ray.get(values_job)
-        for (prop, smiles_batch), values_batch in zip(key_res, all_values):
-            for smi, value in zip(smiles_batch, values_batch):
+        for prop, values_batch in zip(all_properties, all_values):
+            smiles = prop_smiles[prop]
+            for smi, value in zip(smiles, values_batch):
                 df_properties.loc[
                     (df_properties["smiles"] == smi)
                     & (df_properties["property"] == prop),

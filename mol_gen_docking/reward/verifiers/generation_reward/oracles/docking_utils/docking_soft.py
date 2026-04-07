@@ -13,6 +13,7 @@ import time
 from tempfile import TemporaryDirectory
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
 
+import ray
 from rdkit import Chem
 from ringtail.parsers import parse_single_dlg
 
@@ -114,6 +115,7 @@ class BaseDocking:
         print_msgs: bool = True,
         print_output: bool = False,
         debug: bool = True,
+        docking_concurrency_per_gpu: int = 8,
     ) -> None:
         """
             Parameters:
@@ -133,6 +135,7 @@ class BaseDocking:
             - print_msgs: Show Python print messages in console (True) or not (False)
             - print_output: Show Vina docking output in console (True) or not (False)
             - debug: Profiling the Vina docking process and ligand preparation.
+            - docking_concurrency_per_gpu: Number of concurrent docking processes to run on each GPU.
         """
         self.logger = logging.getLogger(
             __name__ + "/" + self.__class__.__name__,
@@ -153,6 +156,7 @@ class BaseDocking:
         self.print_msgs = print_msgs
         self.print_output = print_output
         self.debug = debug
+        self.docking_concurrency_per_gpu = docking_concurrency_per_gpu
 
         if debug:
             self.preparation_profiler = TimedProfiler()
@@ -172,18 +176,12 @@ class BaseDocking:
         else:
             return self.preparator(smis, ligand_paths)
 
-    def _batched_prepare_ligands(
-        self, ligand_dir_path: str, smis: List[str], gpu_ids: List[int] = [0]
-    ) -> Any:
-        # make different directories to support parallelization across multiple GPUs.
-        for gpu_id in gpu_ids:
-            make_dir(f"{ligand_dir_path}/{gpu_id}/", exist_ok=True)
+    def _batched_prepare_ligands(self, ligand_dir_path: str, smis: List[str]) -> Any:
         # create hashed filename for each unique smiles
         ligand_path_fn = get_ligand_hashed_fn(
             ligand_dir_path, n_conformers=self.n_conformers
         )
         # not the fastest implementation, but safe if multiple experiments running at same time (with different tmp file paths)
-        ligand_paths = []
         ligand_paths_by_smiles: Dict[str, List[str]] = {}
         for i in range(len(smis)):
             current_ligand_paths = ligand_path_fn(smis[i])
@@ -202,14 +200,30 @@ class BaseDocking:
                     # Remove unsuccessful Ligands
                     ligand_paths_by_smiles[smi] = []
 
+        return ligand_paths_by_smiles
+
+    def _sub_module_batch_docking(
+        self,
+        smis: List[str],
+        ligand_dir_path: str,
+        ligand_paths_by_smiles: Dict[str, List[str]],
+        output_dir_path: str,
+    ) -> VINA_DOCKING_OUTPUT:
+        gpu_ids = ray.get_gpu_ids()
+
+        # Create GPU-specific subdirectories and distribute ligands
+        make_dir(ligand_dir_path, exist_ok=True)
+        for gpu_id in gpu_ids:
+            make_dir(f"{ligand_dir_path}/{gpu_id}/", exist_ok=True)
+
+        # Gather all ligand paths and split them across GPUs
         ligand_paths = sum(
             [lig_paths for lig_paths in ligand_paths_by_smiles.values() if lig_paths],
             [],
         )
-
-        # Multi-GPU docking: move ligands to the gpu_id directories
         split_ligand_paths = split_list(ligand_paths, len(gpu_ids))
 
+        # Copy ligands to GPU-specific directories
         ligand_dir = []
         for gpu_i in range(len(gpu_ids)):
             gpu_id = gpu_ids[gpu_i]
@@ -224,11 +238,16 @@ class BaseDocking:
                     if self.print_msgs:
                         self.logger.warning(f"Ligand file not found: {ligand_file}")
 
-        return ligand_paths_by_smiles, ligand_dir
+        return self._batched_docking_run(
+            smis,
+            ligand_dir=ligand_dir,
+            ligand_dir_path=ligand_dir_path,
+            ligand_paths_by_smiles=ligand_paths_by_smiles,
+            output_dir_path=output_dir_path,
+            gpu_ids=gpu_ids,
+        )
 
-    def _batched_docking(
-        self, smis: List[str], gpu_ids: List[int] = [0]
-    ) -> VINA_DOCKING_OUTPUT:
+    def _batched_docking(self, smis: List[str]) -> VINA_DOCKING_OUTPUT:
         # make temp pdbqt directories.
         ligand_tempdir = TemporaryDirectory(suffix="_lig")
         output_tempdir = TemporaryDirectory(suffix="_out")
@@ -239,17 +258,36 @@ class BaseDocking:
         make_dir(ligand_dir_path, exist_ok=True)
         make_dir(output_dir_path, exist_ok=True)
 
-        ligand_paths_by_smiles, ligand_dir = self._batched_prepare_ligands(
-            ligand_dir_path=ligand_dir_path, smis=smis, gpu_ids=gpu_ids
+        @ray.remote(num_cpus=2)
+        def batch_prepare_ligands(ligand_dir_path: str, smis: List[str]) -> Any:
+            return self._batched_prepare_ligands(ligand_dir_path, smis)
+
+        ligand_paths_by_smiles = ray.get(
+            batch_prepare_ligands.remote(ligand_dir_path=ligand_dir_path, smis=smis)  # type: ignore
         )
+
         # Run docking attempts multiple times on each GPU in case of failure.
-        output = self._batched_docking_run(
-            smis,
-            ligand_dir=ligand_dir,
-            ligand_dir_path=ligand_dir_path,
-            ligand_paths_by_smiles=ligand_paths_by_smiles,
-            output_dir_path=output_dir_path,
-            gpu_ids=gpu_ids,
+        @ray.remote(num_gpus=1 / self.docking_concurrency_per_gpu, num_cpus=1)
+        def sub_module_batch_docking(
+            smis: List[str],
+            ligand_dir_path: str,
+            ligand_paths_by_smiles: Dict[str, List[str]],
+            output_dir_path: str,
+        ) -> VINA_DOCKING_OUTPUT:
+            return self._sub_module_batch_docking(
+                smis=smis,
+                ligand_dir_path=ligand_dir_path,
+                ligand_paths_by_smiles=ligand_paths_by_smiles,
+                output_dir_path=output_dir_path,
+            )
+
+        output = ray.get(
+            sub_module_batch_docking.remote(  # type: ignore
+                smis,
+                ligand_dir_path=ligand_dir_path,
+                ligand_paths_by_smiles=ligand_paths_by_smiles,
+                output_dir_path=output_dir_path,
+            )
         )
 
         # clean up temp dirs
@@ -271,9 +309,7 @@ class BaseDocking:
     ) -> VINA_DOCKING_OUTPUT:
         raise NotImplementedError
 
-    def __call__(
-        self, smi: Union[str, List[str]], gpu_ids: List[int] = [0]
-    ) -> VINA_DOCKING_OUTPUT:
+    def __call__(self, smi: Union[str, List[str]]) -> VINA_DOCKING_OUTPUT:
         """
         Parameters:
         - smi: SMILES strings to perform docking. A single string activates single-ligand docking mode, while \
@@ -291,7 +327,7 @@ class BaseDocking:
         else:
             raise Exception("smi must be a string or a list of strings")
         if len(smi) > 0:
-            return self._batched_docking(smi_list, gpu_ids=gpu_ids)
+            return self._batched_docking(smi_list)
         else:
             return None
 
@@ -314,6 +350,7 @@ class VinaDocking(BaseDocking):
         print_msgs: bool = True,
         print_output: bool = True,
         debug: bool = True,
+        docking_concurrency_per_gpu: int = 1,
     ) -> None:
         if len(center_pos) != 3:
             raise Exception(
@@ -554,6 +591,7 @@ class AutoDockGPUDocking(BaseDocking):
         print_output: bool = False,
         debug: bool = True,
         agg_type: Literal["mean", "min", "cluster_min"] = "min",
+        docking_concurrency_per_gpu: int = 8,
     ) -> None:
         pdbqt_file = receptor_file.replace(".pdb", "_ag.pdbqt")
         grid_map_file = receptor_file.replace(".pdb", "_ag.maps.fld")
