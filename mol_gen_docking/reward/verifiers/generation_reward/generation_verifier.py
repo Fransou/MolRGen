@@ -278,7 +278,7 @@ class GenerationVerifier(Verifier):
         # Create remote functions with optional placement group scheduling
         if scheduling_strategy is not None:
             _get_property_fast = ray.remote(
-                num_cpus=0,
+                num_cpus=0.5,
                 scheduling_strategy=scheduling_strategy,
             )(_get_property)
             _get_property_long = ray.remote(
@@ -290,7 +290,7 @@ class GenerationVerifier(Verifier):
                 scheduling_strategy=scheduling_strategy,
             )(_get_property)
         else:
-            _get_property_fast = ray.remote(num_cpus=0)(_get_property)
+            _get_property_fast = ray.remote(num_cpus=0.5)(_get_property)
             _get_property_long = ray.remote(
                 num_cpus=1,
                 num_gpus=float(

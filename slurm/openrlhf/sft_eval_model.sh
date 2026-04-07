@@ -11,6 +11,8 @@
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --array=0-0
 
+set -x
+
 DATASET=$1
 CONFIG=$2
 CKPT_PATH=$3
@@ -49,7 +51,7 @@ export docking_oracle=autodock_gpu
 export scorer_exhaustiveness=4
 
 ray start --head --node-ip-address 0.0.0.0 --dashboard-port=$DASHBOARD_PORT
-ssh -N -f -R ${DASHBOARD_PORT}:localhost:${DASHBOARD_PORT} $SLURM_JOB_USER@rorqual4
+#ssh -N -f -R ${DASHBOARD_PORT}:localhost:${DASHBOARD_PORT} $SLURM_JOB_USER@rorqual4
 
 wandb offline
 python -m openrlhf.cli.eval_batch_inference \

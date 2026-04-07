@@ -41,7 +41,7 @@ class MolecularVerifierServerSettings(BaseSettings):
 
         docking_concurrency_per_gpu (int): Number of concurrent docking jobs per GPU.
             Controls GPU utilization.
-            Default: 2
+            Default: 8
 
         reaction_matrix_path (str): Path to the pickled reaction matrix file.
             Must exist and be accessible for reaction verification tasks.
@@ -140,7 +140,7 @@ class MolecularVerifierServerSettings(BaseSettings):
     server_mode: Literal["singleton", "batch"] = "singleton"
     scorer_exhaustiveness: int = 8
     scorer_ncpus: int = 8
-    docking_concurrency_per_gpu: int = 2
+    docking_concurrency_per_gpu: int = 8
     reaction_matrix_path: str = "data/rxn_matrix.pkl"
     docking_oracle: Literal["pyscreener", "autodock_gpu"] = "autodock_gpu"
     vina_mode: str = "autodock_gpu_256wi"

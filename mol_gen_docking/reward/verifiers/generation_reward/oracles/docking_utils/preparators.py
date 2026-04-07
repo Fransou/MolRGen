@@ -9,7 +9,6 @@ from typing import Any, List, Optional
 
 from meeko import AtomTyper, MoleculePreparation, PDBQTWriterLegacy, RDKitMoleculeSetup
 from meeko.reactive import assign_reactive_types
-from multiprocess import Pool
 from openbabel import openbabel as ob
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -248,13 +247,9 @@ class MeekoLigandPreparator(BasePreparator):
         Returns:
             A list of booleans indicating whether new ligand file was created (True) or already exists (False).
         """
-
-        # Create a multiprocessing pool
-        with Pool(self.num_cpus) as pool:
-            results: List[bool] = pool.starmap(
-                self._prepare_ligand,
-                [(smis[i], ligand_paths_by_smiles[i]) for i in range(len(smis))],
-            )
+        results: List[bool] = []
+        for i in range(len(smis)):
+            results.append(self._prepare_ligand(smis[i], ligand_paths_by_smiles[i]))
 
         return results
 

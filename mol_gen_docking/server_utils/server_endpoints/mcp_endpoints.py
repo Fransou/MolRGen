@@ -48,8 +48,8 @@ class ReinventTrainingParams(BaseModel):
     )
     num_train_epochs: int = Field(default=20, description="Number of training epochs")
     eval_batch_size: int = Field(default=64, description="Batch size for evaluation")
-    batch_size: int = Field(default=256, description="Batch size for training")
-    sigma: float = Field(default=0.4, description="Sigma parameter for REINVENT")
+    batch_size: int = Field(default=64, description="Batch size for training")
+    sigma: float = Field(default=0.1, description="Sigma parameter for REINVENT")
     learning_rate: float = Field(default=1e-5, description="Learning rate for REINVENT")
     smiles_start: List[str] = Field(
         default_factory=list,

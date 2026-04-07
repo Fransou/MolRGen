@@ -117,7 +117,7 @@ class GenerationVerifierConfigModel(BaseModel):
                        - docking_oracle: Type of docking oracle ("pyscreener" or "autodock_gpu")
                        - vina_mode: Command mode for AutoDock GPU
         docking_concurrency_per_gpu: Number of concurrent docking runs to allow per GPU.
-                                     Default is 2 (uses ~1GB per run on 80GB GPU).
+                                     Default is 8 (uses ~1GB per run on 80GB GPU).
     """
 
     path_to_mappings: str = Field(
@@ -140,7 +140,7 @@ class GenerationVerifierConfigModel(BaseModel):
     )
 
     docking_concurrency_per_gpu: int = Field(
-        default=2,
+        default=8,
         gt=0,
         description="Number of concurrent docking runs per GPU (each uses ~1GB on 80GB GPU)",
     )
