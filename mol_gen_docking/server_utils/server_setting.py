@@ -54,7 +54,7 @@ class MolecularVerifierServerSettings(BaseSettings):
             "autodock_gpu" for GPU-accelerated AutoDock.
             Default: "autodock_gpu"
 
-        vina_mode (str): Command mode for AutoDock GPU execution.
+        docking_executable (str): Command mode for AutoDock GPU execution.
             Example: "autodock_gpu_256wi" for 256 work items mode.
             Only used when docking_oracle is "autodock_gpu".
             Default: "autodock_gpu_256wi"
@@ -126,7 +126,7 @@ class MolecularVerifierServerSettings(BaseSettings):
         - DOCKING_CONCURRENCY_PER_GPU
         - REACTION_MATRIX_PATH
         - DOCKING_ORACLE
-        - VINA_MODE
+        - DOCKING_EXECUTABLE
         - DATA_PATH
         - BUFFER_TIME
         - PARSING_METHOD
@@ -143,7 +143,7 @@ class MolecularVerifierServerSettings(BaseSettings):
     docking_concurrency_per_gpu: int = 8
     reaction_matrix_path: str = "data/rxn_matrix.pkl"
     docking_oracle: Literal["pyscreener", "autodock_gpu"] = "autodock_gpu"
-    vina_mode: str = "autodock_gpu_256wi"
+    docking_executable: str = "autodock_gpu_256wi"
     data_path: str = "data/molgendata"
     buffer_time: int = 20
     parsing_method: Literal["none", "answer_tags", "boxed"] = "answer_tags"
@@ -245,7 +245,7 @@ class MolecularVerifierServerSettings(BaseSettings):
             "exhaustiveness": self.scorer_exhaustiveness,
             "n_cpu": self.scorer_ncpus,
             "docking_oracle": self.docking_oracle,
-            "vina_mode": self.vina_mode,
+            "docking_executable": self.docking_executable,
         }
 
         # Create GenerationVerifierConfigModel

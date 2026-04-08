@@ -10,7 +10,6 @@ from tdc.utils import receptor_load
 from mol_gen_docking.reward.verifiers.generation_reward.oracles.docking_utils.docking_soft import (
     AutoDockGPUDocking,
     BaseDocking,
-    VinaDocking,
 )
 from mol_gen_docking.reward.verifiers.generation_reward.oracles.docking_utils.preparators import (
     BasePreparator,
@@ -28,9 +27,8 @@ class DockingMoleculeGpuOracle:
     def __init__(
         self,
         path_to_data: str,
-        qv_dir: Optional[Union[Path, str]] = None,
+        docking_executable: Union[Path, str],
         preparator_class: Type[BasePreparator] = MeekoLigandPreparator,
-        vina_mode: str = "QuickVina2",
         aggreggation_type: Literal["mean", "min", "cluster_min"] = "mean",
         gnina: bool = False,
         receptor_path: Optional[Union[Path, str]] = None,
@@ -42,7 +40,7 @@ class DockingMoleculeGpuOracle:
         conformer_attempts: int = 1,
         n_conformers: int = 1,
         docking_attempts: int = 10,
-        docking_batch_size: int = 1024,
+        docking_batch_size: int = 16,
         exhaustiveness: int = 16,
         n_gpu: int = 1,
         gpu_ids: Optional[List[str]] = None,
@@ -51,9 +49,8 @@ class DockingMoleculeGpuOracle:
     ):
         """
         Parameters:
-            qv_dir (Union[Path, str]): Directory containing the Vina executable.
+            docking_executable (Union[Path, str]): Docking executable.
             preparator_class (Type[BasePreparator]): Class for preparing ligands. Default is MeekoLigandPreparator.
-            vina_mode (str): Vina-GPU-2.1 implementation to use. Options are "QuickVina2", "AutoDock-Vina", or "QuickVina-W". Default is "QuickVina2".
             gnina (bool): Whether to use GNINA for rescoring. Default is False.
             receptor_path (Optional[Union[Path, str]]): Path to the receptor file. Required if receptor_name is not provided.
             receptor_name (Optional[str]): Name of the receptor. Required if receptor_path is not provided.
@@ -65,7 +62,7 @@ class DockingMoleculeGpuOracle:
             n_conformers (int): Number of conformers to generate per molecule. Default is 1.
             docking_attempts (int): Number of docking attempts per molecule. Default is 10.
             docking_batch_size (int): Batch size for docking. Default is 25.
-            exhaustiveness (int): Exhaustiveness parameter for Vina. Default is 8000. Note: Minimum is 1000.
+            exhaustiveness (int): Exhaustiveness parameter for docking. Default is 8000. Note: Minimum is 1000.
             n_gpu (int): Number of GPUs to use. Default is 1.
             n_cpu (Optional[int]): Number of CPUs to use. If None, uses all available CPUs.
         """
@@ -82,9 +79,7 @@ class DockingMoleculeGpuOracle:
             )
 
         if receptor_name is not None:
-            if receptor_name.endswith("docking") or receptor_name.endswith(
-                "docking_vina"
-            ):
+            if receptor_name.endswith("docking"):
                 pdbid = receptor_name.split("_")[0]
                 receptor_load(pdbid)
                 self.receptor_path = "./oracle/" + pdbid + ".pdbqt"
@@ -112,8 +107,6 @@ class DockingMoleculeGpuOracle:
         assert size is not None
         self.name = "[DOCKING]-" + receptor_name if receptor_name else receptor_path
 
-        self.vina_mode = vina_mode
-        self.qv_dir = qv_dir
         self.gnina = gnina
         self.size = size
         self.print_msgs = print_msgs
@@ -132,55 +125,24 @@ class DockingMoleculeGpuOracle:
             n_conformers=self.n_conformers,
             num_cpus=self.n_cpu,
         )
-        if self.qv_dir is not None:
-            vina_fullpath = os.path.realpath(f"{self.qv_dir}/{self.vina_mode}-GPU-2.1")
-        else:
-            vina_fullpath = self.vina_mode
-
         self.docking_module_gpu: BaseDocking
-        if self.qv_dir:
-            raise NotImplementedError
-            self.docking_module_gpu = VinaDocking(
-                f"{vina_fullpath}/{self.vina_mode}-GPU-2-1",
-                receptor_file=self.receptor_path,
-                center_pos=self.center,
-                size=self.size,
-                n_conformers=self.n_conformers,
-                get_pose_str=False,
-                preparator=self.preparator,
-                timeout_duration=None,
-                debug=False,
-                print_msgs=self.print_msgs,
-                print_output=True,
-                gpu_ids=gpu_ids,
-                docking_attempts=self.docking_attempts,
-                additional_args={
-                    "thread": self.exhaustiveness,
-                    "opencl_binary_path": vina_fullpath,
-                    "num_modes": 1,
-                },
-                docking_concurrency_per_gpu=docking_concurrency_per_gpu,
-            )
-            raise NotImplementedError
-        else:
-            self.docking_module_gpu = AutoDockGPUDocking(
-                self.vina_mode,
-                receptor_file=self.receptor_path,
-                n_conformers=self.n_conformers,
-                agg_type=self.aggregation_type,
-                get_pose_str=False,
-                preparator=self.preparator,
-                timeout_duration=None,
-                debug=True,
-                print_msgs=self.print_msgs,
-                print_output=False,
-                gpu_ids=gpu_ids,
-                docking_attempts=self.docking_attempts,
-                additional_args={
-                    "--nrun": self.exhaustiveness,
-                },
-                docking_concurrency_per_gpu=docking_concurrency_per_gpu,
-            )
+        self.docking_module_gpu = AutoDockGPUDocking(
+            str(docking_executable),
+            n_conformers=self.n_conformers,
+            agg_type=self.aggregation_type,
+            get_pose_str=False,
+            preparator=self.preparator,
+            timeout_duration=None,
+            debug=True,
+            print_msgs=self.print_msgs,
+            print_output=False,
+            gpu_ids=gpu_ids,
+            docking_attempts=self.docking_attempts,
+            additional_args={
+                "--nrun": self.exhaustiveness,
+            },
+            docking_concurrency_per_gpu=docking_concurrency_per_gpu,
+        )
 
         # if self.gnina:
         #     self.gnina_rescorer = GninaRescorer(
@@ -194,14 +156,14 @@ class DockingMoleculeGpuOracle:
         self, smiles: List[str]
     ) -> Tuple[List[float | None], List[Optional[str]]]:
         """
-        Uses customized QuickVina2-GPU (Tang et al.) implementation to
+        Uses GPU docking implementation to
         calculate docking score against target of choice.
 
         Note: Failure at any point in the pipeline (reading molecule, pdbqt conversion,
             score calculation) returns self.failed_score for that molecule.
         """
 
-        output = self.docking_module_gpu(smiles)
+        output = self.docking_module_gpu(smiles, self.receptor_path)
         if output is None:
             raise ValueError("Failed to compute docking score")
         scores, docked_pdbqts = output

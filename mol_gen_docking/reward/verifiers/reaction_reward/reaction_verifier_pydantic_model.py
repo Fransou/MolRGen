@@ -22,22 +22,18 @@ ReactionObjT = Literal[
 
 
 class ReactionVerifierConfigModel(BaseModel):
-    """Pydantic model for molecular verifier configuration.
+    """Pydantic model for reaction verifier configuration.
 
-    This model defines the configuration parameters for the MolecularVerifier class,
-    providing validation and documentation for all configuration options.
+    This model defines the configuration parameters for the ReactionVerifierConfigModel class,
+    providing validation and documentation for all configuration options related to reaction
+    verification, parsing methods, reward types, and reaction matrix paths.
 
     Attributes:
-        path_to_mappings: Optional path to property mappings and docking targets configuration directory.
-        rescale: Whether to rescale the rewards to a normalized range.
-        reaction_matrix_path: Path to the reaction matrix pickle file used for reaction verification.
-        oracle_kwargs: Dictionary of keyword arguments to pass to the docking oracle. Can include:
-                       - exhaustiveness: Docking exhaustiveness parameter
-                       - n_cpu: Number of CPUs for docking
-                       - docking_oracle: Type of docking oracle ("pyscreener" or "autodock_gpu")
-                       - vina_mode: Command mode for AutoDock GPU
-        docking_concurrency_per_gpu: Number of concurrent docking runs to allow per GPU.
-                                     Default is 2 (uses ~1GB per run on 80GB GPU).
+        parsing_method: Method to parse model completions for SMILES or property values.
+        reward: Reward type, either "property" for property-based or "valid_smiles" for validity-based rewards.
+        reaction_matrix_path: Path to the reaction matrix pickle file for reaction verification.
+        reaction_reward_type: For retro-synthesis, assign reward based on exact match (binary) or Tanimoto similarity.
+        pg_name: Optional name of the Ray placement group to schedule tasks on.
     """
 
     parsing_method: Literal["none", "answer_tags", "boxed"] = Field(

@@ -52,7 +52,7 @@ def scorer(has_gpu: bool, data_path: str, exhaustiveness: int) -> MolecularVerif
                         n_cpu=int(os.environ.get("N_CPUS_DOCKING", exhaustiveness)),
                         exhaustiveness=exhaustiveness,
                         docking_oracle="autodock_gpu",
-                        vina_mode="autodock_gpu_128wi",
+                        docking_executable="autodock_gpu_128wi",
                     ),
                 ),
             )

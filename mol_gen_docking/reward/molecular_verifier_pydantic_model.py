@@ -75,7 +75,7 @@ class MolecularVerifierConfigModel(BaseModel):
                     "exhaustiveness": 8,
                     "n_cpu": 8,
                     "docking_oracle": "autodock_gpu",
-                    "vina_mode": "autodock_gpu_256wi"
+                    "docking_executable": "autodock_gpu_256wi"
                 },
                 docking_concurrency_per_gpu=2
             ),
@@ -159,7 +159,7 @@ class MolecularVerifierConfigModel(BaseModel):
                         "exhaustiveness": 8,
                         "n_cpu": 8,
                         "docking_oracle": "autodock_gpu",
-                        "vina_mode": "autodock_gpu_256wi",
+                        "docking_executable": "autodock_gpu_256wi",
                     },
                     "docking_concurrency_per_gpu": 2,
                 },

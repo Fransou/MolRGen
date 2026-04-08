@@ -73,27 +73,27 @@ class PyscreenerConfigModel(DockingConfigModel):
 
 
 class DockingGPUConfigModel(DockingConfigModel):
-    """Pydantic model for AutoDock GPU docking configuration.
+    """Pydantic model for GPU docking configuration.
 
-    This model defines the configuration parameters specific to the AutoDock GPU
+    This model defines the configuration parameters specific to the GPU
     docking software, providing validation and documentation for all options.
 
     Attributes:
         exhaustiveness: Docking exhaustiveness parameter.
         n_cpu: Number of CPUs to use for docking.
         docking_oracle: Type of docking oracle to use (must be "autodock_gpu").
-        vina_mode: Command mode for AutoDock GPU.
+        docking_executable: Command mode for AutoDock GPU.
     """
 
-    vina_mode: str = Field(
+    docking_executable: str = Field(
         default="autodock_gpu_256wi",
         description="Command mode for AutoDock GPU",
     )
 
     @model_validator(mode="after")
-    def check_vina_mode(self) -> "DockingGPUConfigModel":
+    def check_docking_oracle(self) -> "DockingGPUConfigModel":
         assert self.docking_oracle == "autodock_gpu", (
-            "vina_mode is only valid for autodock_gpu docking_oracle"
+            "GPU docking configuration is only valid for autodock_gpu docking_oracle"
         )
         return self
 
@@ -115,7 +115,7 @@ class GenerationVerifierConfigModel(BaseModel):
                        - exhaustiveness: Docking exhaustiveness parameter
                        - n_cpu: Number of CPUs for docking
                        - docking_oracle: Type of docking oracle ("pyscreener" or "autodock_gpu")
-                       - vina_mode: Command mode for AutoDock GPU
+                       - docking_executable: Command for AutoDock GPU
         docking_concurrency_per_gpu: Number of concurrent docking runs to allow per GPU.
                                      Default is 8 (uses ~1GB per run on 80GB GPU).
     """
@@ -136,7 +136,7 @@ class GenerationVerifierConfigModel(BaseModel):
 
     oracle_kwargs: DockingGPUConfigModel | PyscreenerConfigModel = Field(
         default_factory=DockingGPUConfigModel,
-        description="Keyword arguments for the docking oracle (exhaustiveness, n_cpu, docking_oracle, vina_mode, etc.)",
+        description="Keyword arguments for the docking oracle (exhaustiveness, n_cpu, docking_oracle, docking_executable etc.)",
     )
 
     docking_concurrency_per_gpu: int = Field(
@@ -168,7 +168,7 @@ class GenerationVerifierConfigModel(BaseModel):
                     "exhaustiveness": 8,
                     "n_cpu": 8,
                     "docking_oracle": "autodock_gpu",
-                    "vina_mode": "autodock_gpu_256wi",
+                    "docking_executable": "autodock_gpu_256wi",
                 },
                 "docking_concurrency_per_gpu": 2,
             }
