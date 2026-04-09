@@ -693,11 +693,11 @@ class AutoDockGPUDocking(BaseDocking):
 
         for i in range(len(ligand_dir)):
             if cmd_prefixes is not None and cmd_prefixes[i] is not None:
-                cmd_str = f"{cmd_prefixes[i]} {
-                    self.cmd.format(filelist=ligand_dir[i], ffile=grid_map_file)
-                }"
+                cmd_str = cmd_prefixes[i] + self.cmd.format(
+                    filelist=ligand_dir[i], ffile=grid_map_file
+                )
             else:
-                cmd_str = self.cmd.format(ligand_dir[i])
+                cmd_str = self.cmd.format(filelist=ligand_dir[i], ffile=grid_map_file)
 
             if not self.print_output:
                 cmd_str += " > /dev/null 2>&1"
