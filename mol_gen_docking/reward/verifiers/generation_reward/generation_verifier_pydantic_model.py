@@ -1,7 +1,8 @@
 import os
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+import ray
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from mol_gen_docking.reward.verifiers.abstract_verifier_pydantic_model import (
     VerifierOutputModel,
@@ -89,11 +90,18 @@ class DockingGPUConfigModel(DockingConfigModel):
         n_cpu: Number of CPUs to use for docking.
         docking_oracle: Type of docking oracle to use (must be "autodock_gpu").
         docking_executable: Command mode for AutoDock GPU.
+        docking_num_gpu: Number of GPUs to use for docking. Must be greater than -1 (0 means no GPUs, or use CPU).
     """
 
     docking_executable: str = Field(
         default="autodock_gpu_256wi",
         description="Command mode for AutoDock GPU",
+    )
+
+    docking_num_gpu: int = Field(
+        default=1,
+        gt=-2,
+        description="Number of GPUs to use for docking (must be greater than -1, 0 means CPU only)",
     )
 
     @model_validator(mode="after")
@@ -110,6 +118,21 @@ class DockingGPUConfigModel(DockingConfigModel):
             "GPU docking configuration is only valid for autodock_gpu docking_oracle"
         )
         return self
+
+    @field_validator("docking_num_gpu")
+    @classmethod
+    def check_docking_num_gpu_validator(cls, v: int) -> int:
+        # First check the number of gpus in total in
+        n_total_gpus = ray.cluster_resources().get("GPU", 0)
+        print(n_total_gpus)
+        if v > n_total_gpus:
+            raise ValueError(
+                f"Requested docking_num_gpu {v} exceeds available GPUs {n_total_gpus}"
+            )
+        # If equals to -1, set to n_total_gpus
+        if v == -1:
+            v = n_total_gpus
+        return v
 
 
 class GenerationVerifierConfigModel(BaseModel):
@@ -130,6 +153,7 @@ class GenerationVerifierConfigModel(BaseModel):
                        - n_cpu: Number of CPUs for docking
                        - docking_oracle: Type of docking oracle ("pyscreener" or "autodock_gpu")
                        - docking_executable: Command for AutoDock GPU
+                       - docking_num_gpu: Number of GPUs to use for docking
         docking_concurrency_per_gpu: Number of concurrent docking runs to allow per GPU.
                                      Default is 8 (uses ~1GB per run on 80GB GPU).
     """
@@ -189,8 +213,9 @@ class GenerationVerifierConfigModel(BaseModel):
                     "n_cpu": 8,
                     "docking_oracle": "autodock_gpu",
                     "docking_executable": "autodock_gpu_256wi",
+                    "docking_num_gpu": 1,
                 },
-                "docking_concurrency_per_gpu": 2,
+                "docking_concurrency_per_gpu": 8,
             }
         }
 

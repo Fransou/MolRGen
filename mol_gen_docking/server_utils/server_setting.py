@@ -43,6 +43,11 @@ class MolecularVerifierServerSettings(BaseSettings):
             Controls GPU utilization.
             Default: 8
 
+        docking_num_gpu (int): Number of GPUs to use for docking calculations.
+            Must be greater than -1. Use -1 to select all gpus, or specify the number
+            of GPUs to use (e.g., 1, 2, 4, etc.).
+            Default: 1
+
         reaction_matrix_path (str): Path to the pickled reaction matrix file.
             Must exist and be accessible for reaction verification tasks.
             **WARNING: Should be an absolute path to avoid issues when running in
@@ -124,6 +129,7 @@ class MolecularVerifierServerSettings(BaseSettings):
         - SCORER_EXHAUSTIVENESS
         - SCORER_NCPUS
         - DOCKING_CONCURRENCY_PER_GPU
+        - DOCKING_NUM_GPU
         - REACTION_MATRIX_PATH
         - DOCKING_ORACLE
         - DOCKING_EXECUTABLE
@@ -141,6 +147,7 @@ class MolecularVerifierServerSettings(BaseSettings):
     scorer_exhaustiveness: int = 8
     scorer_ncpus: int = 8
     docking_concurrency_per_gpu: int = 8
+    docking_num_gpu: int = 1
     reaction_matrix_path: str = "data/rxn_matrix.pkl"
     docking_oracle: Literal["pyscreener", "autodock_gpu"] = "autodock_gpu"
     docking_executable: str = "autodock_gpu_256wi"
@@ -167,10 +174,12 @@ class MolecularVerifierServerSettings(BaseSettings):
                 - scorer_exhaustiveness > 0
                 - scorer_ncpus > 0
                 - docking_concurrency_per_gpu > 0
+                - docking_num_gpu > -1
                 - reaction_matrix_path file exists
         """
         assert self.scorer_exhaustiveness > 0, "Exhaustiveness must be greater than 0"
         assert self.scorer_ncpus > 0, "Number of CPUs must be greater than 0"
+        assert self.docking_num_gpu > -1, "Number of GPUs must be greater than -1"
 
         assert Path(self.reaction_matrix_path).exists(), (
             f"Reaction matrix file {self.reaction_matrix_path} does not exist"
@@ -246,6 +255,7 @@ class MolecularVerifierServerSettings(BaseSettings):
             "n_cpu": self.scorer_ncpus,
             "docking_oracle": self.docking_oracle,
             "docking_executable": self.docking_executable,
+            "docking_num_gpu": self.docking_num_gpu,
         }
 
         # Create GenerationVerifierConfigModel

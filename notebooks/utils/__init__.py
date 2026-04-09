@@ -22,6 +22,7 @@ CMAP_MODELS = {
     "ChemDFM-v2.0": palette[1],
     "RL-Mistral": palette[-1],
     "RL-Mistral-100": palette[-2],
+    "RL-Molstral": palette[-3],
     "ether0": palette[2],
 }
 
@@ -48,6 +49,7 @@ MARKER_MODELS = {
     # Chemistry-specialized models
     "RL-Mistral": "X",
     "RL-Mistral-100": "X",
+    "RL-Molstral": "X",
     "ChemDFM-R": "^",
     "ChemDFM-v2.0": "o",
     "ether0": "v",

@@ -40,7 +40,7 @@ Analyze the results and repeat this process 2 times, adapting the hyperparameter
 *If the objective is too hard to optimize, you can also change the optimization strategy, and compute the true reward a posteriori (e.g., by minimizing a property instead of reaching values below a threshold).*
 ### Stage 2: Hyperparameter Optimization & Structure Analysis
 
-Spawn two parrallel sub-agents to analyze the results from Stage 1:
+Spawn two parallel sub-agents to analyze the results from Stage 1:
 
 **Sub-agent 2a: Hyperparameter Analysis** (`training_analyzer`): Collects results from the Stage 1 sub-agents's training metrics and provides a comprehensive analysis to identify the optimal hyperparameter configuration.
 

@@ -27,6 +27,7 @@ class DockingMoleculeGpuOracle:
         failed_score: float = 0.0,
         n_conformers: int = 1,
         docking_batch_size: int = 16,
+        docking_actor_pool: Optional[ray.util.ActorPool] = None,
         **kwargs: Any,
     ):
         """
@@ -39,7 +40,7 @@ class DockingMoleculeGpuOracle:
             print_msgs (bool): Whether to print messages during docking. Default is False.
             failed_score (float): Score to assign when docking fails. Default is 0.0.
             n_conformers (int): Number of conformers to generate per molecule. Default is 1.
-            docking_batch_size (int): Batch size for docking. Default is 25.
+            docking_batch_size (int): Batch size for docking. Default is 16.
         """
 
         super().__init__()
@@ -87,6 +88,8 @@ class DockingMoleculeGpuOracle:
         self.failed_score = failed_score
         self.n_conformers = n_conformers
         self.batch_size = docking_batch_size
+        assert docking_actor_pool is not None
+        self.docking_actor_pool = docking_actor_pool
 
         # if self.gnina:
         #     self.gnina_rescorer = GninaRescorer(
@@ -159,16 +162,16 @@ class DockingMoleculeGpuOracle:
             List of docking scores corresponding to each SMILES.
         """
         scores: List[float] = []
-        docking_module_gpu = ray.get_actor("docking_actor")
-        outputs_jobs = []
-        for chunk in _chunks(smiles, self.batch_size):
-            outputs_jobs.append(
-                docking_module_gpu.dock_smis.remote(
-                    smi=smiles, receptor_file=self.receptor_path
-                )
+        outputs = list(
+            self.docking_actor_pool.map(
+                lambda a, v: a.dock_smis.remote(
+                    smi=v, receptor_file=self.receptor_path
+                ),
+                list(
+                    _chunks(smiles, self.batch_size),
+                ),
             )
-
-        outputs = ray.get(outputs_jobs)
+        )
         for chunk, output in zip(_chunks(smiles, self.batch_size), outputs):
             scores_chunk, docked_pdbqts = self.dock_batch_qv2gpu(chunk, output)
             if scores_chunk is not None:

@@ -4,12 +4,15 @@ import logging
 from typing import Any, Callable, Dict, List, Literal
 
 import ray
-from ray.actor import ActorProxy
+from ray.util import ActorPool
 from tdc.oracles import Oracle
 
 from mol_gen_docking.utils.property_utils import (
     rescale_property_values,
 )
+
+# Set logging to info
+logger = logging.getLogger(__name__)
 
 
 @ray.remote(concurrency_groups={"serial_init": 1})  # type: ignore
@@ -40,9 +43,11 @@ class ScorerRegistery:
         self.property_name_mapping = property_name_mapping
         self.docking_target_list = docking_target_list
 
-        self._docking_gpu_module: ActorProxy[Any] | None = None
+        self._docking_gpu_pool: ActorPool[Any] | None = None
         self._preparator: Any | None = None
         self.docking_concurrency_actor = docking_concurrency_actor
+
+        self.logger = logging.getLogger(__name__ + "/" + self.__class__.__name__)
 
     @ray.method(concurrency_group="serial_init")
     def set_docking_gpu_module(
@@ -56,6 +61,7 @@ class ScorerRegistery:
         docking_concurrency_per_gpu: int = 8,
         n_conformers: int = 1,
         conformer_attempts: int = 1,
+        docking_num_gpu: int = 1,
     ) -> Any:
         """Initialize and configure the GPU docking module.
 
@@ -73,7 +79,7 @@ class ScorerRegistery:
         Returns:
             The initialized docking GPU module actor.
         """
-        if self._docking_gpu_module is None:
+        if self._docking_gpu_pool is None:
             from mol_gen_docking.reward.verifiers.generation_reward.oracles.docking_utils.docking_soft import (
                 AutoDockGPUDocking,
             )
@@ -81,19 +87,15 @@ class ScorerRegistery:
                 MeekoLigandPreparator,
             )
 
+            num_docking_gpu_actors = int(docking_num_gpu * docking_concurrency_per_gpu)
             if preparator_class is None:
                 preparator_class = MeekoLigandPreparator
             preparator = preparator_class(
                 conformer_attempts=conformer_attempts,
                 n_conformers=n_conformers,
             )
-
-            self._docking_gpu_module = AutoDockGPUDocking.options(  # type: ignore
-                name="docking_actor",
-                get_if_exists=True,
-                max_concurrency=self.docking_concurrency_actor,
-            ).remote(
-                str(docking_executable),
+            init_kwargs = dict(
+                cmd=str(docking_executable),
                 n_conformers=n_conformers,
                 agg_type=aggregation_type,
                 get_pose_str=False,
@@ -108,14 +110,25 @@ class ScorerRegistery:
                 },
                 docking_concurrency_per_gpu=docking_concurrency_per_gpu,
             )
-            # Wait of at most 5m for the actor to be available, otherwise return an error
-            try:
-                ray.get(self._docking_gpu_module.ping.remote(), timeout=300)
-            except ray.exceptions.GetTimeoutError:
-                err_msg = """Docking GPU module is not responding after 5 minutes.\n This could be due to ressources not being available to initialize the actor, consider scaling your ray cluster, or lowering the number of cpus used by the scorer_registry."""
+            actors = [
+                AutoDockGPUDocking.options(  # type: ignore
+                    num_gpus=1 / docking_concurrency_per_gpu, name=f"docking_{i}"
+                ).remote(**init_kwargs)
+                for i in range(num_docking_gpu_actors)
+            ]
+            self._docking_gpu_pool = ActorPool(actors)
+            print(
+                f"Running {num_docking_gpu_actors} Docking Actors on {docking_num_gpu}."
+            )
 
-                self.logger.error(err_msg)
-                raise TimeoutError(err_msg)
+            ready_checks = [a.ping.remote() for a in actors]
+            try:
+                ray.get(ready_checks, timeout=300)
+            except ray.exceptions.GetTimeoutError:
+                raise TimeoutError(
+                    "Timeout while waiting for docking GPU actors to be ready. "
+                    "Try reducing the concurrency per gpu."
+                )
 
     @ray.method(concurrency_group="serial_init")  # type: ignore
     def assign_evaluator(
@@ -157,7 +170,10 @@ class ScorerRegistery:
 
                 self.set_docking_gpu_module(**kwargs)
                 eval_fn = DockingMoleculeGpuOracle(
-                    path_to_data=path_to_data, receptor_name=oracle_name, **kwargs
+                    path_to_data=path_to_data,
+                    receptor_name=oracle_name,
+                    docking_actor_pool=self._docking_gpu_pool,
+                    **kwargs,
                 )
         elif oracle_name.lower() in [
             "drd2",

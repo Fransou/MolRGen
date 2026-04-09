@@ -355,43 +355,12 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         make_dir(output_dir_path, exist_ok=True)
         ligand_paths_by_smiles = self._batched_prepare_ligands(ligand_dir_path, smis)
 
-        # Run docking attempts multiple times on each GPU in case of failure.
-        @ray.remote(num_gpus=1 / self.docking_concurrency_per_gpu, num_cpus=1)
-        def sub_module_batch_docking(
-            smis: List[str],
-            ligand_dir_path: str,
-            ligand_paths_by_smiles: Dict[str, List[str]],
-            output_dir_path: str,
-            receptor_file: str,
-        ) -> DOCKING_OUTPUT:
-            """Remote function for performing docking on a GPU sub-module.
-
-            Args:
-                smis: List of SMILES strings to dock.
-                ligand_dir_path: Path to directory containing ligand files.
-                ligand_paths_by_smiles: Dictionary mapping SMILES to their file paths.
-                output_dir_path: Path to directory for docking output.
-                receptor_file: Path to receptor file.
-
-            Returns:
-                Tuple of (scores, docked_poses) or None.
-            """
-            return self._sub_module_batch_docking(
-                smis=smis,
-                ligand_dir_path=ligand_dir_path,
-                ligand_paths_by_smiles=ligand_paths_by_smiles,
-                output_dir_path=output_dir_path,
-                receptor_file=receptor_file,
-            )
-
-        output = ray.get(
-            sub_module_batch_docking.remote(  # type: ignore
-                smis,
-                ligand_dir_path=ligand_dir_path,
-                ligand_paths_by_smiles=ligand_paths_by_smiles,
-                output_dir_path=output_dir_path,
-                receptor_file=receptor_file,
-            )
+        output = self._sub_module_batch_docking(
+            smis=smis,
+            ligand_dir_path=ligand_dir_path,
+            ligand_paths_by_smiles=ligand_paths_by_smiles,
+            output_dir_path=output_dir_path,
+            receptor_file=receptor_file,
         )
 
         # clean up temp dirs
@@ -450,7 +419,7 @@ class BaseDocking:  # Keep base class fo BC and future softwares
                 smi_list = smi
         else:
             raise Exception("smi must be a string or a list of strings")
-        if len(smi) > 0:
+        if len(smi_list) > 0:
             return self._batched_docking(smis=smi_list, receptor_file=receptor_file)
         else:
             return None
