@@ -16,7 +16,6 @@ class DockingConfigModel(BaseModel):
 
     Attributes:
         exhaustiveness: Docking exhaustiveness parameter.
-        n_cpu: Number of CPUs to use for docking.
         docking_oracle: Type of docking oracle to use ("pyscreener" or "autodock_gpu").
     """
 
@@ -24,12 +23,6 @@ class DockingConfigModel(BaseModel):
         default=8,
         gt=1,
         description="Docking exhaustiveness parameter",
-    )
-
-    n_cpu: int = Field(
-        default=8,
-        gt=1,
-        description="Number of CPUs to use for docking",
     )
 
     docking_oracle: Literal["pyscreener", "autodock_gpu"] = Field(
@@ -63,9 +56,22 @@ class PyscreenerConfigModel(DockingConfigModel):
         default="vina",
         description="Docking software class to use with PyScreener",
     )
+    n_cpu: int = Field(
+        default=8,
+        gt=1,
+        description="Number of CPUs to use for docking",
+    )
 
     @model_validator(mode="after")
     def check_software_class(self) -> "PyscreenerConfigModel":
+        """Validate that software_class is only used with pyscreener docking_oracle.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            AssertionError: If docking_oracle is not 'pyscreener'.
+        """
         assert self.docking_oracle == "pyscreener", (
             "software_class is only valid for pyscreener docking_oracle"
         )
@@ -92,6 +98,14 @@ class DockingGPUConfigModel(DockingConfigModel):
 
     @model_validator(mode="after")
     def check_docking_oracle(self) -> "DockingGPUConfigModel":
+        """Validate that this configuration is only used with autodock_gpu docking_oracle.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            AssertionError: If docking_oracle is not 'autodock_gpu'.
+        """
         assert self.docking_oracle == "autodock_gpu", (
             "GPU docking configuration is only valid for autodock_gpu docking_oracle"
         )
@@ -148,6 +162,12 @@ class GenerationVerifierConfigModel(BaseModel):
     parsing_method: Literal["none", "answer_tags", "boxed"] = Field(
         default="answer_tags",
         description="Method to parse model completions for SMILES or property values.",
+    )
+
+    n_cpus: int = Field(
+        default=4,
+        gt=0,
+        description="Number of CPUs for the router",
     )
 
     pg_name: Optional[str] = Field(

@@ -1,0 +1,14 @@
+{
+    "Synthetic accessibility": "SA",
+    "Quantitative estimate of drug-likeness": "QED",
+    "Molecular Weight": "CalcExactMolWt",
+    "Number of Aromatic Rings": "CalcNumAromaticRings",
+    "Number of H-bond acceptors": "CalcNumHBA",
+    "Number of H-bond donors": "CalcNumHBD",
+    "Number of Rotatable Bonds": "CalcNumRotatableBonds",
+    "Fraction of C atoms Sp3 hybridised": "CalcFractionCSP3",
+    "Topological Polar Surface Area": "CalcTPSA",
+    "Hall-Kier alpha": "CalcHallKierAlpha",
+    "Kier Phi": "CalcPhi",
+    "logP": "logP"
+}

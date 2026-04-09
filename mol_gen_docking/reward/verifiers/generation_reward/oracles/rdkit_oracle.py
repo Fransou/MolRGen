@@ -55,6 +55,14 @@ class RDKITOracle:
     """
 
     def __init__(self, name: str):
+        """Initialize RDKit descriptor oracle.
+
+        Args:
+            name: Name of the RDKit descriptor to use.
+
+        Raises:
+            ValueError: If the descriptor name is not found in RDKit.
+        """
         self.name = name
         self.descriptor = self.get_descriptor()
 

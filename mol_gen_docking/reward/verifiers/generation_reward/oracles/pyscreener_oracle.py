@@ -14,10 +14,25 @@ from tqdm import tqdm
 
 class DockingVirtualScreenWithTimeout(DockingVirtualScreen):
     def __init__(self, timeout: int = 60, *args: Any, **kwargs: Any) -> None:
+        """Initialize docking virtual screen with timeout.
+
+        Args:
+            timeout: Timeout in seconds for docking simulations.
+            *args: Additional positional arguments passed to parent class.
+            **kwargs: Additional keyword arguments passed to parent class.
+        """
         self.timeout = timeout
         super().__init__(*args, **kwargs)
 
     def run(self, simulationss: List[List[Any]]) -> List[List[Any]]:
+        """Run docking simulations with timeout handling.
+
+        Args:
+            simulationss: List of lists of simulation parameters.
+
+        Returns:
+            List of lists of docking results.
+        """
         refss = [
             [self.prepare_and_run.remote(s) for s in sims] for sims in simulationss
         ]
@@ -51,6 +66,19 @@ class PyscreenerOracle:
         exhaustiveness: int = 8,
         **kwargs: Any,
     ):
+        """Initialize PyScreener docking oracle.
+
+        Args:
+            target_name: Name of the docking target.
+            path_to_data: Path to directory containing receptor files and pocket info.
+            software_class: Docking software to use (vina, qvina, smina, etc.).
+            n_cpu: Number of CPUs to use for docking.
+            exhaustiveness: Docking exhaustiveness parameter.
+            **kwargs: Additional keyword arguments for docking configuration.
+
+        Raises:
+            ValueError: If software_class is not implemented.
+        """
         if software_class not in [
             "vina",
             "qvina",
@@ -115,6 +143,15 @@ class PyscreenerOracle:
     def __call__(
         self, test_smiles: str | List[str], error_value: float | None = None
     ) -> Any:
+        """Compute docking scores for SMILES string(s).
+
+        Args:
+            test_smiles: SMILES string or list of SMILES strings to dock.
+            error_value: Value to return when docking fails.
+
+        Returns:
+            Docking score or list of docking scores.
+        """
         final_score = self.scorer(test_smiles)
 
         if isinstance(test_smiles, str):

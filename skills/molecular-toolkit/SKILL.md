@@ -17,6 +17,7 @@ allowed-tools:
 
 ## When to use this skill
 Use the `molecular_toolkit` skill when you need to perform tasks related to molecular generation, property calculation, or docking target identification. This skill provides a set of tools that can assist in various stages of molecular design and analysis.
+The file [rdkit_properties](assets/rdkit_properties.json) contains a list of standard properties that can be queried to the server.
 
 ## Molecular Generation Workflow
 The process begins by identifying the corresponding objectives in the [properties](skills/molecular-toolkit/assets/properties.json) file (do not directly open it as it is a large file, but you can search for specific properties within it), to obtain the id of the property that can be given to the MolRGen mcp server.

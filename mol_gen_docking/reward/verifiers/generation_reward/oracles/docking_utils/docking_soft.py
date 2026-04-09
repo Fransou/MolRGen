@@ -20,6 +20,13 @@ DOCKING_OUTPUT = None | Tuple[List[float | None], List[str | None]]
 
 
 def make_dir(rel_path: str, *args: Any, **kwargs: Any) -> None:
+    """Create a directory at the specified path.
+
+    Args:
+        rel_path: Relative path to create.
+        *args: Additional positional arguments passed to os.makedirs.
+        **kwargs: Additional keyword arguments passed to os.makedirs.
+    """
     os.makedirs(os.path.abspath(rel_path), *args, **kwargs)
 
 
@@ -35,6 +42,13 @@ def sanitize_smi_name_for_file(smi: str) -> str:
 def move_files_from_dir(
     source_dir_path: str, dest_dir_path: str, include_only: List[str] = []
 ) -> None:
+    """Move files from source directory to destination directory.
+
+    Args:
+        source_dir_path: Path to source directory.
+        dest_dir_path: Path to destination directory.
+        include_only: Optional list of filenames to include (move all if empty).
+    """
     files = os.listdir(source_dir_path)
     if len(include_only) > 0:
         files = [f for f in files if f in include_only]
@@ -63,7 +77,26 @@ def split_list(lst: List[Any], n: int) -> List[List[Any]]:
 def get_ligand_hashed_fn(
     path: str, n_conformers: int, suffix: str = ""
 ) -> Callable[[str], List[str]]:
+    """Create a function that generates hashed filenames for ligand conformers.
+
+    Args:
+        path: Base directory path for ligand files.
+        n_conformers: Number of conformers to generate per SMILES.
+        suffix: Optional suffix to append to filenames.
+
+    Returns:
+        A function that takes a SMILES string and returns a list of file paths.
+    """
+
     def ligand_hashed_fn(smi: str) -> List[str]:
+        """Generate a list of hashed file paths for a SMILES string.
+
+        Args:
+            smi: SMILES string to hash.
+
+        Returns:
+            List of absolute file paths for each conformer.
+        """
         return [
             os.path.abspath(
                 f"{path}/{sanitize_smi_name_for_file(smi)}_{i}_{suffix}.pdbqt"
@@ -75,17 +108,35 @@ def get_ligand_hashed_fn(
 
 
 class TimedProfiler:
+    """Profiler for timing function executions and computing averages."""
+
     def __init__(self) -> None:
+        """Initialize the profiler with zero values."""
         self._count = 0.0
         self._total = 0.0
         self._average = 0.0
 
     def _add_value(self, value: float) -> None:
+        """Add a timing value to the profiler.
+
+        Args:
+            value: Time duration to add.
+        """
         self._total += value
         self._count += 1
         self._average = self._total / self._count
 
     def time_it(self, fn: Callable[..., Any] | None, *args: Any, **kwargs: Any) -> Any:
+        """Time a function execution and record the duration.
+
+        Args:
+            fn: Function to time.
+            *args: Positional arguments to pass to the function.
+            **kwargs: Keyword arguments to pass to the function.
+
+        Returns:
+            The return value of the function, or 0 if fn is None.
+        """
         if fn is None:
             return 0
         start_time = time.time()
@@ -95,10 +146,17 @@ class TimedProfiler:
         return res
 
     def get_average(self) -> float:
+        """Get the average time from all recorded values.
+
+        Returns:
+            The average time duration.
+        """
         return self._average
 
 
 class BaseDocking:  # Keep base class fo BC and future softwares
+    """Base class for docking implementations."""
+
     def __init__(
         self,
         cmd: str,
@@ -108,31 +166,27 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         additional_args: Optional[Dict[str, Any]] = None,
         preparator: Optional[Callable[[List[str], List[List[str]]], List[bool]]] = None,
         cwd: Optional[str] = None,
-        gpu_ids: Union[None, str, List[str]] = None,
         docking_attempts: int = 10,
         print_msgs: bool = True,
         print_output: bool = False,
         debug: bool = True,
         docking_concurrency_per_gpu: int = 8,
     ) -> None:
-        """
-            Parameters:
-            - cmd: Command line prefix to execute command
-            - receptor_file: Cleaned receptor PDBQT file to use for docking
-            - n_conformers: how many times are we docking each SMILES string?
-            - get_pose_str: Return output pose as string (True) or not (False)
-            - timeout_duration: Timeout in seconds before new process automatically stops
-            - additional_args: Dictionary of additional command arguments
-            - preparator: Function/Class callable to prepare molecule for docking. Should take the \
-                argument format (smiles strings, ligand paths)
-            - cwd: Change current working directory (sometimes needed for GPU versions)
-            - gpu_ids: GPU ids to use for multi-GPU docking (0 is default for single-GPU nodes). If None, \
-                use all GPUs.
-            - docking_attempts: Number of docking attempts to make on each GPU.
-            - print_msgs: Show Python print messages in console (True) or not (False)
-            - print_output: Show docking output in console (True) or not (False)
-            - debug: Profiling the docking process and ligand preparation.
-            - docking_concurrency_per_gpu: Number of concurrent docking processes to run on each GPU.
+        """Initialize the base docking class.
+
+        Args:
+            cmd: Command line prefix to execute command.
+            n_conformers: How many times to dock each SMILES string.
+            get_pose_str: Return output pose as string (True) or not (False).
+            timeout_duration: Timeout in seconds before process automatically stops.
+            additional_args: Dictionary of additional command arguments.
+            preparator: Function/Class callable to prepare molecule for docking.
+            cwd: Change current working directory (sometimes needed for GPU versions).
+            docking_attempts: Number of docking attempts to make on each GPU.
+            print_msgs: Show Python print messages in console (True) or not (False).
+            print_output: Show docking output in console (True) or not (False).
+            debug: Profiling the docking process and ligand preparation.
+            docking_concurrency_per_gpu: Number of concurrent docking processes to run on each GPU.
         """
         self.logger = logging.getLogger(
             __name__ + "/" + self.__class__.__name__,
@@ -156,9 +210,25 @@ class BaseDocking:  # Keep base class fo BC and future softwares
             self.preparation_profiler = TimedProfiler()
             self.docking_profiler = TimedProfiler()
 
+    def ping(self) -> bool:
+        """Health check for the docking service.
+
+        Returns:
+            True if the service is healthy.
+        """
+        return True
+
     def _prepare_ligands(
         self, ligand_paths_by_smiles: Dict[str, List[str]]
     ) -> List[bool]:
+        """Prepare ligands for docking.
+
+        Args:
+            ligand_paths_by_smiles: Dictionary mapping SMILES to their file paths.
+
+        Returns:
+            List of booleans indicating whether each ligand was prepared successfully.
+        """
         # Perform ligand preparation and save to proper path (tmp/non-tmp ligand dir)
         smis = list(ligand_paths_by_smiles.keys())
         ligand_paths = list(ligand_paths_by_smiles.values())
@@ -171,6 +241,15 @@ class BaseDocking:  # Keep base class fo BC and future softwares
             return self.preparator(smis, ligand_paths)
 
     def _batched_prepare_ligands(self, ligand_dir_path: str, smis: List[str]) -> Any:
+        """Prepare a batch of ligands for docking.
+
+        Args:
+            ligand_dir_path: Path to directory for ligand files.
+            smis: List of SMILES strings to prepare.
+
+        Returns:
+            Dictionary mapping SMILES to their prepared file paths.
+        """
         # create hashed filename for each unique smiles
         ligand_path_fn = get_ligand_hashed_fn(
             ligand_dir_path, n_conformers=self.n_conformers
@@ -204,6 +283,18 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         output_dir_path: str,
         receptor_file: str,
     ) -> DOCKING_OUTPUT:
+        """Perform docking on a sub-module (GPU-specific) batch.
+
+        Args:
+            smis: List of SMILES strings to dock.
+            ligand_dir_path: Path to directory containing ligand files.
+            ligand_paths_by_smiles: Dictionary mapping SMILES to their file paths.
+            output_dir_path: Path to directory for docking output.
+            receptor_file: Path to receptor file.
+
+        Returns:
+            Tuple of (scores, docked_poses) or None.
+        """
         gpu_ids = ray.get_gpu_ids()
 
         # Create GPU-specific subdirectories and distribute ligands
@@ -244,6 +335,15 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         )
 
     def _batched_docking(self, smis: List[str], receptor_file: str) -> DOCKING_OUTPUT:
+        """Perform batched docking on a list of SMILES.
+
+        Args:
+            smis: List of SMILES strings to dock.
+            receptor_file: Path to receptor file.
+
+        Returns:
+            Tuple of (scores, docked_poses) or None.
+        """
         # make temp pdbqt directories.
         ligand_tempdir = TemporaryDirectory(suffix="_lig")
         output_tempdir = TemporaryDirectory(suffix="_out")
@@ -264,6 +364,18 @@ class BaseDocking:  # Keep base class fo BC and future softwares
             output_dir_path: str,
             receptor_file: str,
         ) -> DOCKING_OUTPUT:
+            """Remote function for performing docking on a GPU sub-module.
+
+            Args:
+                smis: List of SMILES strings to dock.
+                ligand_dir_path: Path to directory containing ligand files.
+                ligand_paths_by_smiles: Dictionary mapping SMILES to their file paths.
+                output_dir_path: Path to directory for docking output.
+                receptor_file: Path to receptor file.
+
+            Returns:
+                Tuple of (scores, docked_poses) or None.
+            """
             return self._sub_module_batch_docking(
                 smis=smis,
                 ligand_dir_path=ligand_dir_path,
@@ -278,6 +390,7 @@ class BaseDocking:  # Keep base class fo BC and future softwares
                 ligand_dir_path=ligand_dir_path,
                 ligand_paths_by_smiles=ligand_paths_by_smiles,
                 output_dir_path=output_dir_path,
+                receptor_file=receptor_file,
             )
         )
 
@@ -299,9 +412,26 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         gpu_ids: List[int],
         receptor_file: str,
     ) -> DOCKING_OUTPUT:
+        """Run batched docking on multiple GPUs.
+
+        Args:
+            smis: List of SMILES strings to dock.
+            ligand_dir: List of paths to ligand directories for each GPU.
+            ligand_dir_path: Base path to ligand directory.
+            ligand_paths_by_smiles: Dictionary mapping SMILES to their file paths.
+            output_dir_path: Path to directory for docking output.
+            gpu_ids: List of GPU IDs to use.
+            receptor_file: Path to receptor file.
+
+        Returns:
+            Tuple of (scores, docked_poses) or None.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclasses.
+        """
         raise NotImplementedError
 
-    def __call__(
+    def dock_smis(
         self, smi: Union[str, List[str]], receptor_file: str
     ) -> DOCKING_OUTPUT:
         """
@@ -321,12 +451,15 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         else:
             raise Exception("smi must be a string or a list of strings")
         if len(smi) > 0:
-            return self._batched_docking(smi_list, receptor_file)
+            return self._batched_docking(smis=smi_list, receptor_file=receptor_file)
         else:
             return None
 
 
+@ray.remote
 class AutoDockGPUDocking(BaseDocking):
+    """AutoDock GPU implementation of docking."""
+
     def __init__(
         self,
         cmd: str,
@@ -336,7 +469,6 @@ class AutoDockGPUDocking(BaseDocking):
         additional_args: Optional[Dict[str, Any]] = None,
         preparator: Optional[Callable[[List[str], List[List[str]]], List[bool]]] = None,
         cwd: Optional[str] = None,
-        gpu_ids: Union[None, str, List[str]] = None,
         docking_attempts: int = 10,
         print_msgs: bool = True,
         print_output: bool = False,
@@ -344,6 +476,23 @@ class AutoDockGPUDocking(BaseDocking):
         agg_type: Literal["mean", "min", "cluster_min"] = "min",
         docking_concurrency_per_gpu: int = 8,
     ) -> None:
+        """Initialize AutoDock GPU docking.
+
+        Args:
+            cmd: Command line prefix for AutoDock GPU.
+            n_conformers: Number of conformers to generate per molecule.
+            get_pose_str: Return output pose as string (True) or not (False).
+            timeout_duration: Timeout in seconds before process automatically stops.
+            additional_args: Dictionary of additional command arguments.
+            preparator: Function/Class callable to prepare molecule for docking.
+            cwd: Change current working directory.
+            docking_attempts: Number of docking attempts to make on each GPU.
+            print_msgs: Show Python print messages in console (True) or not (False).
+            print_output: Show docking output in console (True) or not (False).
+            debug: Profiling the docking process and ligand preparation.
+            agg_type: Aggregation type for docking scores ('mean', 'min', 'cluster_min').
+            docking_concurrency_per_gpu: Number of concurrent docking processes per GPU.
+        """
         super().__init__(
             cmd=cmd,
             n_conformers=n_conformers,
@@ -352,7 +501,6 @@ class AutoDockGPUDocking(BaseDocking):
             additional_args=additional_args,
             preparator=preparator,
             cwd=cwd,
-            gpu_ids=gpu_ids,
             docking_attempts=docking_attempts,
             print_msgs=print_msgs,
             print_output=print_output,
@@ -375,6 +523,20 @@ class AutoDockGPUDocking(BaseDocking):
         gpu_ids: List[int],
         receptor_file: str,
     ) -> DOCKING_OUTPUT:
+        """Run batched docking on multiple GPUs for AutoDock GPU.
+
+        Args:
+            smis: List of SMILES strings to dock.
+            ligand_dir: List of paths to ligand directories for each GPU.
+            ligand_dir_path: Base path to ligand directory.
+            ligand_paths_by_smiles: Dictionary mapping SMILES to their file paths.
+            output_dir_path: Path to directory for docking output.
+            gpu_ids: List of GPU IDs to use.
+            receptor_file: Path to receptor file.
+
+        Returns:
+            Tuple of (scores, docked_poses) or None.
+        """
         # Perform docking procedure(s)
         if self.print_msgs:
             self.logger.info("Ligands prepared. Docking...")
@@ -491,6 +653,14 @@ class AutoDockGPUDocking(BaseDocking):
 
     @staticmethod
     def _get_output_pose(output_path: str) -> Union[str, None]:
+        """Get the output pose from a docking output file.
+
+        Args:
+            output_path: Path to the docking output file.
+
+        Returns:
+            The docked PDBQT string, or None if file not found.
+        """
         try:
             with open(output_path) as f:
                 docked_pdbqt = f.read()
@@ -505,8 +675,13 @@ class AutoDockGPUDocking(BaseDocking):
         receptor_file: str,
         cmd_prefixes: Optional[List[str]] = None,
     ) -> None:
-        """
-        Runs docking in separate shell process(es).
+        """Run docking in separate shell process(es).
+
+        Args:
+            ligand_dir: List of paths to ligand directories.
+            blocking: Whether to wait for docking to complete.
+            receptor_file: Path to receptor file.
+            cmd_prefixes: Optional list of command prefixes for each GPU.
         """
         grid_map_file = os.path.abspath(receptor_file.replace(".pdb", "_ag.maps.fld"))
         assert os.path.exists(grid_map_file), "Grid map file not found"
@@ -546,6 +721,14 @@ class AutoDockGPUDocking(BaseDocking):
                     proc.kill()
 
     def _is_docking_complete(self, ligand_dir: List[str]) -> bool:
+        """Check if docking is complete for all ligand directories.
+
+        Args:
+            ligand_dir: List of paths to ligand directories.
+
+        Returns:
+            True if docking is complete for all directories.
+        """
         return all(
             len([f for f in os.listdir(lg_dir) if f.endswith(".dlg")]) > 0
             for lg_dir in ligand_dir

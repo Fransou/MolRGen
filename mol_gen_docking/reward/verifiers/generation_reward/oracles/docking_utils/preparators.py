@@ -15,14 +15,32 @@ from rdkit.Chem import AllChem
 
 
 class RDKitMoleculeSetupNoSym(RDKitMoleculeSetup):
+    """RDKit molecule setup without symmetry computation for performance."""
+
     @staticmethod
     def get_symmetries_for_rmsd(mol: Any, max_matches: int = 17) -> tuple:
-        """We remove symmetry computation to reduce the overhead."""
+        """We remove symmetry computation to reduce the overhead.
+
+        Args:
+            mol: RDKit molecule.
+            max_matches: Maximum number of symmetry matches.
+
+        Returns:
+            Empty tuple (no symmetry computation).
+        """
         return tuple()
 
 
 class MoleculePreparator(MoleculePreparation):
+    """Molecule preparator using RDKitMoleculeSetupNoSym for performance."""
+
     def __init__(self, *args: Any, **kwargs: Any):
+        """Initialize molecule preparator with no-symmetry setup.
+
+        Args:
+            *args: Positional arguments passed to parent class.
+            **kwargs: Keyword arguments passed to parent class.
+        """
         super().__init__(*args, **kwargs)
         self._classes_setup = {Chem.rdchem.Mol: RDKitMoleculeSetupNoSym}
 
@@ -169,42 +187,56 @@ class BasePreparator(abc.ABC):
     """
 
     def __init__(self, conformer_attempts: int, n_conformers: int, **kwargs: Any):
+        """Initialize base preparator.
+
+        Args:
+            conformer_attempts: Number of times to retry conformer generation on failure.
+            n_conformers: Number of conformers to generate per SMILES string.
+            **kwargs: Additional keyword arguments.
+        """
         self.conformer_attempts = conformer_attempts
         self.n_conformers = n_conformers
         self._check_install()
 
     @abc.abstractmethod
     def _check_install(self) -> None:
-        """
-        Checks if necessary dependencies are installed.
+        """Check if necessary dependencies are installed.
+
+        Raises:
+            Exception: If required dependencies are not installed.
         """
 
     def __call__(
         self, smis: List[str], ligand_paths_by_smiles: List[List[str]]
     ) -> List[bool]:
-        """
-        Prepares a SMILES string or list of SMILES strings.
+        """Prepare a list of SMILES strings.
 
         Args:
-            smi: SMILES string or list of SMILES strings.
-            ligand_path: Path to which ligand conformers to be docked are saved. Not user-specified.
+            smis: List of SMILES strings to prepare.
+            ligand_paths_by_smiles: List of paths where ligand files should be saved.
 
         Returns:
             A list of booleans indicating whether preparation was successful.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclasses.
         """
         raise NotImplementedError
 
     @abc.abstractmethod
     def _prepare_ligand(self, smi: str, ligand_path: List[str], **kwargs: Any) -> bool:
-        """
-        Prepares a single SMILES string.
+        """Prepare a single SMILES string.
 
         Args:
-            smi: SMILES string.
-            ligand_path: Path to which ligand conformers to be docked are saved. Not user-specified.
+            smi: SMILES string to prepare.
+            ligand_path: List of paths where ligand conformer files should be saved.
+            **kwargs: Additional keyword arguments.
 
         Returns:
             A boolean indicating whether preparation was successful.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclasses.
         """
         raise NotImplementedError
 
@@ -218,23 +250,31 @@ class MeekoLigandPreparator(BasePreparator):
         self,
         conformer_attempts: int = 3,
         n_conformers: int = 1,
-        num_cpus: Optional[int] = None,
         pH: float = 7.4,
         remove_stereo_chemistry_on_fail: bool = True,  # TODO: Check Bredt's rule for bridged bonds
     ):
+        """Initialize Meeko ligand preparator.
+
+        Args:
+            conformer_attempts: Number of times to retry conformer generation on failure.
+            n_conformers: Number of conformers to generate per SMILES string.
+            pH: pH value for ligand preparation.
+            remove_stereo_chemistry_on_fail: Whether to remove stereochemistry on failure.
+        """
         super().__init__(conformer_attempts, n_conformers)
         self.ligand_critic_errors: List[str] = []
         self.logger = logging.getLogger(
             __name__ + "/" + self.__class__.__name__,
         )
-        if num_cpus is None:
-            self.num_cpus = len(os.sched_getaffinity(0))
-        else:
-            self.num_cpus = num_cpus
         self.pH = pH
         self.remove_stereo_chemistry_on_fail = remove_stereo_chemistry_on_fail
 
     def _check_install(self) -> None:
+        """Check if Meeko package is installed.
+
+        Raises:
+            Exception: If Meeko package is not installed.
+        """
         try:
             pass
         except ImportError:
@@ -243,7 +283,12 @@ class MeekoLigandPreparator(BasePreparator):
     def __call__(
         self, smis: List[str], ligand_paths_by_smiles: List[List[str]]
     ) -> List[bool]:
-        """
+        """Prepare a list of SMILES strings for docking.
+
+        Args:
+            smis: List of SMILES strings to prepare.
+            ligand_paths_by_smiles: List of paths where ligand files should be saved.
+
         Returns:
             A list of booleans indicating whether new ligand file was created (True) or already exists (False).
         """
@@ -254,6 +299,16 @@ class MeekoLigandPreparator(BasePreparator):
         return results
 
     def _prepare_ligand(self, smi: str, ligand_path: List[str], **kwargs: Any) -> bool:
+        """Prepare a single SMILES string for docking.
+
+        Args:
+            smi: SMILES string to prepare.
+            ligand_path: List of paths where ligand conformer files should be saved.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            True if preparation was successful, False otherwise.
+        """
         for j in range(0, len(ligand_path), self.n_conformers):
             if any(
                 os.path.exists(path) for path in ligand_path[j : j + self.n_conformers]
