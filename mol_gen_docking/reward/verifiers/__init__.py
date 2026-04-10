@@ -16,9 +16,11 @@ from .abstract_verifier_pydantic_model import (
 )
 from .generation_reward.generation_verifier import GenerationVerifier
 from .generation_reward.generation_verifier_pydantic_model import (
+    DockingGPUConfigModel,
     GenerationVerifierConfigModel,
     GenerationVerifierMetadataModel,
     GenerationVerifierOutputModel,
+    PyscreenerConfigModel,
 )
 from .generation_reward.input_metadata import GenerationVerifierInputMetadataModel
 from .mol_prop_reward.input_metadata import MolPropVerifierInputMetadataModel
@@ -100,4 +102,7 @@ __all__ = [
     ###
     "assign_to_inputs",
     "BatchVerifiersInputModel",
+    ###
+    "DockingGPUConfigModel",
+    "PyscreenerConfigModel",
 ]

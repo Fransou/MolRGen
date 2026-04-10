@@ -4,11 +4,15 @@ from typing import Literal, Optional
 
 import ray
 from pydantic_settings import BaseSettings
+from reward.verifiers.generation_reward.generation_verifier_pydantic_model import (
+    DockingConfigModel,
+)
 
 from mol_gen_docking.reward import (
     GenerationVerifierConfigModel,
     MolecularVerifierConfigModel,
     MolPropVerifierConfigModel,
+    PyscreenerConfigModel,
     ReactionVerifierConfigModel,
 )
 
@@ -82,6 +86,11 @@ class MolecularVerifierServerSettings(BaseSettings):
             - "answer_tags": Extract content within special tags
             - "boxed": Extract content within answer tags and boxed in the '\\boxed{...}' LaTeX command
 
+        generation_verifier_ncpus (int): Number of CPU cores to allocate for generation
+            verification tasks. Used for Ray actor resource scheduling when running
+            generation verifier tasks. Must be greater than 0.
+            Default: 4
+
         debug_logging (bool): Enable detailed debug logging for server operations.
             Useful for troubleshooting and development.
             Default: False
@@ -136,6 +145,7 @@ class MolecularVerifierServerSettings(BaseSettings):
         - DATA_PATH
         - BUFFER_TIME
         - PARSING_METHOD
+        - GENERATION_VERIFIER_NCPUS
         - DEBUG_LOGGING
         - RAY_NAMESPACE
         - PG_NAME
@@ -154,6 +164,7 @@ class MolecularVerifierServerSettings(BaseSettings):
     data_path: str = "data/molgendata"
     buffer_time: int = 20
     parsing_method: Literal["none", "answer_tags", "boxed"] = "answer_tags"
+    generation_verifier_ncpus: int = 1
     debug_logging: bool = False
     ray_namespace: Optional[str] = None
     pg_name: Optional[str] = None
@@ -250,13 +261,24 @@ class MolecularVerifierServerSettings(BaseSettings):
                 This can happen if data_path or reaction_matrix_path are invalid.
         """
         # Create oracle kwargs from server settings
-        oracle_kwargs = {
-            "exhaustiveness": self.scorer_exhaustiveness,
-            "n_cpu": self.scorer_ncpus,
-            "docking_oracle": self.docking_oracle,
-            "docking_executable": self.docking_executable,
-            "docking_num_gpu": self.docking_num_gpu,
-        }
+        if self.docking_oracle == "pyscreener":
+            oracle_kwargs = PyscreenerConfigModel.model_validate(
+                {
+                    "docking_oracle": self.docking_oracle,
+                    "exhaustiveness": self.scorer_exhaustiveness,
+                    "n_cpu": self.scorer_ncpus,
+                }
+            )
+        elif self.docking_oracle == "autodock_gpu":
+            oracle_kwargs = DockingConfigModel.model_validate(
+                {
+                    "exhaustiveness": self.scorer_exhaustiveness,
+                    "docking_oracle": self.docking_oracle,
+                    "docking_executable": self.docking_executable,
+                    "docking_num_gpu": self.docking_num_gpu,
+                    "docking_concurrency_per_gpu": self.docking_concurrency_per_gpu,
+                }
+            )
 
         # Create GenerationVerifierConfigModel
         generation_config = GenerationVerifierConfigModel(
@@ -264,8 +286,8 @@ class MolecularVerifierServerSettings(BaseSettings):
             reward=reward,
             rescale=True,
             oracle_kwargs=oracle_kwargs,
-            docking_concurrency_per_gpu=self.docking_concurrency_per_gpu,
             pg_name=self.pg_name,
+            generation_verifier_ncpus=self.generation_verifier_ncpus,
         )
 
         # Create ReactionVerifierConfigModel

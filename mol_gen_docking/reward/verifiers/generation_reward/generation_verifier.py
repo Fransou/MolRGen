@@ -114,12 +114,13 @@ class GenerationVerifier(Verifier):
         if scheduling_strategy is not None:
             scorer_registry_remote = ScorerRegistery.options(  # type: ignore
                 scheduling_strategy=scheduling_strategy,
-                num_cpus=verifier_config.n_cpus,
-                max_concurrency=verifier_config.n_cpus,
+                num_cpus=verifier_config.generation_verifier_ncpus,
+                max_concurrency=verifier_config.generation_verifier_ncpus,
             )
         else:
             scorer_registry_remote = ScorerRegistery.options(  # type: ignore
-                num_cpus=verifier_config.n_cpus, max_concurrency=verifier_config.n_cpus
+                num_cpus=verifier_config.generation_verifier_ncpus,
+                max_concurrency=verifier_config.generation_verifier_ncpus,
             )
         self.scorer_registry: ActorProxy[ScorerRegistery] = (
             scorer_registry_remote.remote(
@@ -287,9 +288,6 @@ class GenerationVerifier(Verifier):
             # If the reward is long to compute, use ray
             smiles = prop_smiles[p]
             oracle_kwargs = self.verifier_config.oracle_kwargs.model_dump()
-            oracle_kwargs["docking_concurrency_per_gpu"] = (
-                self.verifier_config.docking_concurrency_per_gpu
-            )
             ray.get(
                 self.scorer_registry.assign_evaluator.remote(
                     path_to_data=self.verifier_config.path_to_mappings

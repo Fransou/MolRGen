@@ -28,10 +28,12 @@ from .molecular_verifier_pydantic_model import (
 )
 from .verifiers import (
     BatchVerifiersInputModel,
+    DockingGPUConfigModel,
     GenerationVerifier,
     GenerationVerifierConfigModel,
     MolPropVerifier,
     MolPropVerifierConfigModel,
+    PyscreenerConfigModel,
     ReactionVerifier,
     ReactionVerifierConfigModel,
 )
@@ -40,10 +42,15 @@ __all__ = [
     "MolecularVerifier",
     "MolecularVerifierConfigModel",
     "BatchVerifiersInputModel",
+    ###
     "GenerationVerifier",
     "MolPropVerifier",
     "ReactionVerifier",
+    ###
     "GenerationVerifierConfigModel",
     "MolPropVerifierConfigModel",
     "ReactionVerifierConfigModel",
+    ###
+    "PyscreenerConfigModel",
+    "DockingGPUConfigModel",
 ]

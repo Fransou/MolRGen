@@ -26,7 +26,6 @@ class ScorerRegistery:
         debug: bool = False,
         property_name_mapping: Dict[str, str] = {},
         docking_target_list: List[str] = [],
-        docking_concurrency_actor: int = 16,
     ):
         """Initialize the ScorerRegistry.
 
@@ -45,7 +44,6 @@ class ScorerRegistery:
 
         self._docking_gpu_pool: ActorPool[Any] | None = None
         self._preparator: Any | None = None
-        self.docking_concurrency_actor = docking_concurrency_actor
 
         self.logger = logging.getLogger(__name__ + "/" + self.__class__.__name__)
 
@@ -53,15 +51,15 @@ class ScorerRegistery:
     def set_docking_gpu_module(
         self,
         docking_executable: str,
-        preparator_class: Any = None,
-        aggregation_type: Literal["mean", "min", "cluster_min"] = "mean",
-        print_msgs: bool = True,
-        docking_attempts: int = 10,
-        exhaustiveness: int = 16,
-        docking_concurrency_per_gpu: int = 8,
-        n_conformers: int = 1,
+        exhaustiveness: int,
+        docking_concurrency_per_gpu: int,
+        docking_num_gpu: int,
         conformer_attempts: int = 1,
-        docking_num_gpu: int = 1,
+        n_conformers: int = 1,
+        docking_attempts: int = 10,
+        print_msgs: bool = True,
+        aggregation_type: Literal["mean", "min", "cluster_min"] = "mean",
+        preparator_class: Any = None,
     ) -> Any:
         """Initialize and configure the GPU docking module.
 
