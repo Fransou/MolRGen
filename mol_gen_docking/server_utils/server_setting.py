@@ -3,12 +3,11 @@ from pathlib import Path
 from typing import Literal, Optional
 
 import ray
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
-from reward.verifiers.generation_reward.generation_verifier_pydantic_model import (
-    DockingConfigModel,
-)
 
 from mol_gen_docking.reward import (
+    DockingGPUConfigModel,
     GenerationVerifierConfigModel,
     MolecularVerifierConfigModel,
     MolPropVerifierConfigModel,
@@ -164,13 +163,32 @@ class MolecularVerifierServerSettings(BaseSettings):
     data_path: str = "data/molgendata"
     buffer_time: int = 20
     parsing_method: Literal["none", "answer_tags", "boxed"] = "answer_tags"
-    generation_verifier_ncpus: int = 1
+    generation_verifier_ncpus: int = 4
     debug_logging: bool = False
     ray_namespace: Optional[str] = None
     pg_name: Optional[str] = None
     ray_ip: Optional[str] = None
     ray_port: Optional[int] = None
     ray_tmp_dir: Optional[str] = None
+
+    @field_validator("generation_verifier_ncpus")
+    @classmethod
+    def cap_generation_verifier_ncpus(cls, v: int) -> int:
+        """Validate and cap the generation_verifier_ncpus to available cluster resources.
+
+        Ensures that the requested number of CPUs for generation verification does not
+        exceed the available CPUs in the Ray cluster. Reserves 2 CPUs for system overhead.
+
+        Args:
+            v (int): The requested number of CPU cores for generation verification tasks.
+
+        Returns:
+            int: The capped number of CPUs, limited to (total_cluster_cpus - 2).
+                Returns the requested value if it's less than the maximum available,
+                otherwise returns the maximum available after reserving 2 CPUs.
+        """
+        n_cpus_max = ray.cluster_resources().get("CPU", 0) - 2
+        return v if v < n_cpus_max else n_cpus_max
 
     def __post_init__(self) -> None:
         """Validate all settings after initialization.
@@ -261,6 +279,7 @@ class MolecularVerifierServerSettings(BaseSettings):
                 This can happen if data_path or reaction_matrix_path are invalid.
         """
         # Create oracle kwargs from server settings
+        oracle_kwargs: DockingGPUConfigModel | PyscreenerConfigModel
         if self.docking_oracle == "pyscreener":
             oracle_kwargs = PyscreenerConfigModel.model_validate(
                 {
@@ -270,7 +289,7 @@ class MolecularVerifierServerSettings(BaseSettings):
                 }
             )
         elif self.docking_oracle == "autodock_gpu":
-            oracle_kwargs = DockingConfigModel.model_validate(
+            oracle_kwargs = DockingGPUConfigModel.model_validate(
                 {
                     "exhaustiveness": self.scorer_exhaustiveness,
                     "docking_oracle": self.docking_oracle,
