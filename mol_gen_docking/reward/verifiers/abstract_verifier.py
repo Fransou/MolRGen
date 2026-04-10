@@ -109,7 +109,7 @@ class Verifier:
             return self.parse_none(completion)
         elif self.verifier_config.parsing_method == "answer_tags":
             tags = self.parse_answer_tags(completion)
-            boxed = self.parse_boxed(completion)
+            boxed = self.parse_boxed(tags)
             if boxed != "":
                 return boxed
             return tags
