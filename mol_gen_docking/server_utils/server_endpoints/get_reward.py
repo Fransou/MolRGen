@@ -1,7 +1,9 @@
+import asyncio
 import logging
 import time
 from typing import Dict
 
+import ray
 from fastapi import FastAPI
 
 from mol_gen_docking.server_utils.server_setting import MolecularVerifierServerSettings
@@ -57,10 +59,11 @@ async def prepare_receptor_endpoint(
     if targets == []:
         return {"status": "Success"}
 
-    missed_receptors_1, missed_receptors_2 = (
-        app.state.receptor_processor.process_receptors(
+    missed_receptors_1, missed_receptors_2 = await asyncio.to_thread(
+        ray.get,
+        app.state.receptor_processor.process_receptors.remote(
             receptors=targets, allow_bad_res=True
-        )
+        ),
     )
     if len(missed_receptors_2) > 0:
         # Return error if some receptors could not be processed

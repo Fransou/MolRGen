@@ -1,7 +1,8 @@
 import os
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+import ray
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from mol_gen_docking.reward.verifiers.abstract_verifier_pydantic_model import (
     VerifierOutputModel,
@@ -16,7 +17,6 @@ class DockingConfigModel(BaseModel):
 
     Attributes:
         exhaustiveness: Docking exhaustiveness parameter.
-        n_cpu: Number of CPUs to use for docking.
         docking_oracle: Type of docking oracle to use ("pyscreener" or "autodock_gpu").
     """
 
@@ -24,12 +24,6 @@ class DockingConfigModel(BaseModel):
         default=8,
         gt=1,
         description="Docking exhaustiveness parameter",
-    )
-
-    n_cpu: int = Field(
-        default=8,
-        gt=1,
-        description="Number of CPUs to use for docking",
     )
 
     docking_oracle: Literal["pyscreener", "autodock_gpu"] = Field(
@@ -63,9 +57,22 @@ class PyscreenerConfigModel(DockingConfigModel):
         default="vina",
         description="Docking software class to use with PyScreener",
     )
+    n_cpu: int = Field(
+        default=8,
+        gt=1,
+        description="Number of CPUs to use for docking",
+    )
 
     @model_validator(mode="after")
     def check_software_class(self) -> "PyscreenerConfigModel":
+        """Validate that software_class is only used with pyscreener docking_oracle.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            AssertionError: If docking_oracle is not 'pyscreener'.
+        """
         assert self.docking_oracle == "pyscreener", (
             "software_class is only valid for pyscreener docking_oracle"
         )
@@ -73,29 +80,80 @@ class PyscreenerConfigModel(DockingConfigModel):
 
 
 class DockingGPUConfigModel(DockingConfigModel):
-    """Pydantic model for AutoDock GPU docking configuration.
+    """Pydantic model for GPU docking configuration.
 
-    This model defines the configuration parameters specific to the AutoDock GPU
+    This model defines the configuration parameters specific to the GPU
     docking software, providing validation and documentation for all options.
 
     Attributes:
         exhaustiveness: Docking exhaustiveness parameter.
-        n_cpu: Number of CPUs to use for docking.
         docking_oracle: Type of docking oracle to use (must be "autodock_gpu").
-        vina_mode: Command mode for AutoDock GPU.
+        docking_executable: Command mode for AutoDock GPU.
+        docking_concurrency_per_gpu: Number of concurrent docking runs to allow per GPU.
+                                     Default is 8 (uses ~1GB per run on 80GB GPU).
+        docking_num_gpu: Number of GPUs to use for docking. Must be greater than -1 (0 means no GPUs, or use CPU).
     """
 
-    vina_mode: str = Field(
+    docking_executable: str = Field(
         default="autodock_gpu_256wi",
         description="Command mode for AutoDock GPU",
     )
 
+    docking_num_gpu: int = Field(
+        default=1,
+        gt=-2,
+        description="Number of GPUs to use for docking (must be greater than -1, 0 means CPU only)",
+    )
+
+    docking_concurrency_per_gpu: int = Field(
+        default=8,
+        gt=0,
+        description="Number of concurrent docking runs per GPU (each uses ~1GB on 80GB GPU)",
+    )
+
     @model_validator(mode="after")
-    def check_vina_mode(self) -> "DockingGPUConfigModel":
+    def check_docking_oracle(self) -> "DockingGPUConfigModel":
+        """Validate that this configuration is only used with autodock_gpu docking_oracle.
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            AssertionError: If docking_oracle is not 'autodock_gpu'.
+        """
         assert self.docking_oracle == "autodock_gpu", (
-            "vina_mode is only valid for autodock_gpu docking_oracle"
+            "GPU docking configuration is only valid for autodock_gpu docking_oracle"
         )
         return self
+
+    @field_validator("docking_num_gpu")
+    @classmethod
+    def check_docking_num_gpu_validator(cls, v: int) -> int:
+        """Validate and normalize the number of GPUs to use for docking.
+
+        Checks that the requested number of GPUs does not exceed the available GPUs
+        in the Ray cluster. If the value is -1, it is automatically set to the total
+        number of available GPUs.
+
+        Args:
+            v: Number of GPUs requested (-1 means use all available, 0 means CPU only).
+
+        Returns:
+            The validated/normalized GPU count.
+
+        Raises:
+            ValueError: If the requested GPU count exceeds the total available GPUs.
+        """
+        # Check the total number of GPUs in the Ray cluster
+        n_total_gpus = ray.cluster_resources().get("GPU", 0)
+        if v > n_total_gpus:
+            raise ValueError(
+                f"Requested docking_num_gpu {v} exceeds available GPUs {n_total_gpus}"
+            )
+        # If equals to -1, set to n_total_gpus
+        if v == -1:
+            v = n_total_gpus
+        return v
 
 
 class GenerationVerifierConfigModel(BaseModel):
@@ -110,18 +168,19 @@ class GenerationVerifierConfigModel(BaseModel):
         reward: Type of reward to compute. Either "property" for property-based rewards or "valid_smiles"
                 for validity-based rewards.
         rescale: Whether to rescale the rewards to a normalized range.
-        oracle_kwargs: Dictionary of keyword arguments to pass to the docking oracle. Can include:
-
-                       - exhaustiveness: Docking exhaustiveness parameter
-                       - n_cpu: Number of CPUs for docking
-                       - docking_oracle: Type of docking oracle ("pyscreener" or "autodock_gpu")
-                       - vina_mode: Command mode for AutoDock GPU
-        docking_concurrency_per_gpu: Number of concurrent docking runs to allow per GPU.
-                                     Default is 2 (uses ~1GB per run on 80GB GPU).
+        oracle_kwargs: Dictionary of keyword arguments to pass to the docking oracle.
+        parsing_method: Method to parse model completions for extracting SMILES or property values.
+                       Options: "none" (no parsing), "answer_tags" (parse <answer> tags),
+                       or "boxed" (parse \\boxed{} blocks).
+        generation_verifier_ncpus: Number of CPUs to allocate for the generation verifier actor.
+                                   Used for Ray actor resource scheduling.
+        pg_name: Optional name of the Ray placement group to schedule generation verifier tasks on.
+                 If not specified, tasks will use the default scheduling.
     """
 
     path_to_mappings: str = Field(
-        description="Path to property mappings and docking targets configuration directory (must contain names_mapping.json and docking_targets.json)",
+        default="",
+        description="Optional path to property mappings and docking targets configuration directory (must contain names_mapping.json and docking_targets.json)",
     )
 
     reward: Literal["property", "valid_smiles"] = Field(
@@ -136,18 +195,18 @@ class GenerationVerifierConfigModel(BaseModel):
 
     oracle_kwargs: DockingGPUConfigModel | PyscreenerConfigModel = Field(
         default_factory=DockingGPUConfigModel,
-        description="Keyword arguments for the docking oracle (exhaustiveness, n_cpu, docking_oracle, vina_mode, etc.)",
-    )
-
-    docking_concurrency_per_gpu: int = Field(
-        default=2,
-        gt=0,
-        description="Number of concurrent docking runs per GPU (each uses ~1GB on 80GB GPU)",
+        description="Keyword arguments for the docking oracle (exhaustiveness, n_cpu, docking_oracle, docking_executable etc.)",
     )
 
     parsing_method: Literal["none", "answer_tags", "boxed"] = Field(
         default="answer_tags",
         description="Method to parse model completions for SMILES or property values.",
+    )
+
+    generation_verifier_ncpus: int = Field(
+        default=1,
+        gt=0,
+        description="Number of CPUs for the router",
     )
 
     pg_name: Optional[str] = Field(
@@ -156,7 +215,13 @@ class GenerationVerifierConfigModel(BaseModel):
     )
 
     class Config:
-        """Pydantic configuration."""
+        """Pydantic configuration for GenerationVerifierConfigModel.
+
+        Attributes:
+            arbitrary_types_allowed: Allows arbitrary types (like Ray objects) in the model.
+            json_schema_extra: Provides a JSON schema example for the model configuration,
+                             demonstrating typical values for all fields.
+        """
 
         arbitrary_types_allowed = True
         json_schema_extra = {
@@ -168,15 +233,27 @@ class GenerationVerifierConfigModel(BaseModel):
                     "exhaustiveness": 8,
                     "n_cpu": 8,
                     "docking_oracle": "autodock_gpu",
-                    "vina_mode": "autodock_gpu_256wi",
+                    "docking_executable": "autodock_gpu_256wi",
+                    "docking_num_gpu": 1,
+                    "docking_concurrency_per_gpu": 8,
                 },
-                "docking_concurrency_per_gpu": 2,
             }
         }
 
     @model_validator(mode="after")
     def check_mappings_path(self) -> "GenerationVerifierConfigModel":
-        """Validate that the path_to_mappings exists and contains required files."""
+        """Validate that the path_to_mappings exists and contains required files.
+
+        Checks that the specified path exists and contains both required configuration files:
+        - names_mapping.json: Contains property name mappings
+        - docking_targets.json: Contains docking target definitions
+
+        Returns:
+            Self for method chaining.
+
+        Raises:
+            ValueError: If the path does not exist or required files are missing.
+        """
         if self.path_to_mappings is not None:
             if not os.path.exists(self.path_to_mappings):
                 raise ValueError(

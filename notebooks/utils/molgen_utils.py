@@ -29,9 +29,12 @@ def load_molgen_results(
         with f.open("r") as fd:
             for i_l, line in enumerate(fd):
                 g = json.loads(line)
-                reward_metadata = g["reward_meta"].get(
-                    "generation_verifier_metadata", {}
-                )
+                if "reward_meta" not in g:
+                    reward_metadata = g["metadata"]["reward_meta"]
+                else:
+                    reward_metadata = g["reward_meta"].get(
+                        "generation_verifier_metadata", g["reward_meta"]
+                    )
                 all_smis = reward_metadata.get("all_smi", [""])
                 fail_reason = "valid"
                 if len(all_smis) == 0:

@@ -9,11 +9,12 @@ import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
 import ray
+from ray.actor import ActorProxy
 from rdkit import Chem, RDLogger
 
 from mol_gen_docking.reward.verifiers.abstract_verifier import (
@@ -31,9 +32,8 @@ from mol_gen_docking.reward.verifiers.generation_reward.input_metadata import (
     GenerationObjT,
     GenerationVerifierInputMetadataModel,
 )
-from mol_gen_docking.reward.verifiers.generation_reward.oracle_wrapper import (
-    OracleWrapper,
-    get_oracle,
+from mol_gen_docking.reward.verifiers.generation_reward.scorer_registry import (
+    ScorerRegistery,
 )
 from mol_gen_docking.utils.property_utils import (
     has_bridged_bond,
@@ -110,7 +110,24 @@ class GenerationVerifier(Verifier):
         self.docking_target_list = docking_target_list
         self.slow_props = docking_target_list  # + ["GSK3B", "JNK3", "DRD2"]
 
-        self.oracles: Dict[str, OracleWrapper] = {}
+        scheduling_strategy = self.get_placement_group_strat()
+        if scheduling_strategy is not None:
+            scorer_registry_remote = ScorerRegistery.options(  # type: ignore
+                scheduling_strategy=scheduling_strategy,
+                num_cpus=verifier_config.generation_verifier_ncpus,
+                max_concurrency=verifier_config.generation_verifier_ncpus,
+            )
+        else:
+            scorer_registry_remote = ScorerRegistery.options(  # type: ignore
+                num_cpus=verifier_config.generation_verifier_ncpus,
+                max_concurrency=verifier_config.generation_verifier_ncpus,
+            )
+        self.scorer_registry: ActorProxy[ScorerRegistery] = (
+            scorer_registry_remote.remote(
+                property_name_mapping=self.property_name_mapping,
+                docking_target_list=self.docking_target_list,
+            )
+        )
         self.debug = False  # Only for tests
 
     def get_smiles_from_completion(self, comp: str) -> Tuple[List[str], str]:
@@ -145,6 +162,14 @@ class GenerationVerifier(Verifier):
         mkd_pattern = re.compile(r"^(\*\*|[-*'])(.+)\1$")
 
         def filter_smiles(x: str) -> str:
+            """Filter a string to check if it could be a valid SMILES.
+
+            Args:
+                x: String to check.
+
+            Returns:
+                The string if it might be a SMILES, empty string otherwise.
+            """
             x = x.replace("<|im_end|>", "")
             if len(x) < 3:
                 return ""
@@ -163,6 +188,14 @@ class GenerationVerifier(Verifier):
 
         # Finally we remove any string that is not a valid SMILES
         def test_is_valid_batch(smis: list[str]) -> list[bool]:
+            """Test if a batch of SMILES strings are valid.
+
+            Args:
+                smis: List of SMILES strings to validate.
+
+            Returns:
+                List of booleans indicating whether each SMILES is valid.
+            """
             RDLogger.DisableLog("rdApp.*")
             results = []
             for smi in smis:
@@ -244,61 +277,6 @@ class GenerationVerifier(Verifier):
                 'obj', 'target_value', 'id_completion']. The 'value' column will
                 be filled with computed property values.
         """
-
-        def _get_property(
-            smiles: List[str],
-            prop: str,
-            rescale: bool = True,
-            kwargs: Dict[str, Any] = {},
-        ) -> List[float]:
-            """
-            Get property reward
-            """
-            oracle_fn = self.oracles.get(
-                prop,
-                get_oracle(
-                    prop,
-                    path_to_data=self.verifier_config.path_to_mappings
-                    if self.verifier_config.path_to_mappings
-                    else "",
-                    docking_target_list=self.docking_target_list,
-                    property_name_mapping=self.property_name_mapping,
-                    **kwargs,
-                ),
-            )
-            if prop not in self.oracles:
-                self.oracles[prop] = oracle_fn
-            property_reward: np.ndarray | float = oracle_fn(smiles, rescale=rescale)
-            assert isinstance(property_reward, np.ndarray)
-
-            return [float(p) for p in property_reward]
-
-        # Prepare scheduling strategy if placement group is specified
-        scheduling_strategy = self.get_placement_group_strat()
-        # Create remote functions with optional placement group scheduling
-        if scheduling_strategy is not None:
-            _get_property_fast = ray.remote(
-                num_cpus=0,
-                scheduling_strategy=scheduling_strategy,
-            )(_get_property)
-            _get_property_long = ray.remote(
-                num_cpus=1,
-                num_gpus=float(
-                    "gpu" in self.verifier_config.oracle_kwargs.docking_oracle
-                )
-                / self.verifier_config.docking_concurrency_per_gpu,
-                scheduling_strategy=scheduling_strategy,
-            )(_get_property)
-        else:
-            _get_property_fast = ray.remote(num_cpus=0)(_get_property)
-            _get_property_long = ray.remote(
-                num_cpus=1,
-                num_gpus=float(
-                    "gpu" in self.verifier_config.oracle_kwargs.docking_oracle
-                )
-                / self.verifier_config.docking_concurrency_per_gpu,
-            )(_get_property)
-
         all_properties = df_properties["property"].unique().tolist()
         prop_smiles = {
             p: df_properties[df_properties["property"] == p]["smiles"].unique().tolist()
@@ -306,29 +284,30 @@ class GenerationVerifier(Verifier):
         }
 
         values_job = []  # Get property jobs
-        key_res = []  # Corresponding keys - maps each batch to (prop, smiles_batch)
         for p in all_properties:
             # If the reward is long to compute, use ray
             smiles = prop_smiles[p]
-            if p in self.slow_props:
-                _get_property_remote = _get_property_long
-            else:
-                _get_property_remote = _get_property_fast
-            for i_smi in range(0, len(smiles), 4):  # Process smiles by batches of 4
-                smiles_batch = smiles[i_smi : min(len(smiles), i_smi + 4)]
-                values_job.append(
-                    _get_property_remote.remote(
-                        smiles_batch,
-                        p,
-                        rescale=self.verifier_config.rescale,
-                        kwargs=self.verifier_config.oracle_kwargs.model_dump(),
-                    )
+            oracle_kwargs = self.verifier_config.oracle_kwargs.model_dump()
+            ray.get(
+                self.scorer_registry.assign_evaluator.remote(
+                    path_to_data=self.verifier_config.path_to_mappings
+                    if self.verifier_config.path_to_mappings
+                    else "",
+                    oracle_name=p,
+                    **oracle_kwargs,
                 )
-                # Store the mapping for this batch: (prop, [smiles_in_batch])
-                key_res.append((p, smiles_batch))
+            )
+            values_job.append(
+                self.scorer_registry.get_score.remote(  # type: ignore
+                    smiles,
+                    oracle_name=p,
+                    rescale=self.verifier_config.rescale,
+                )
+            )
         all_values = ray.get(values_job)
-        for (prop, smiles_batch), values_batch in zip(key_res, all_values):
-            for smi, value in zip(smiles_batch, values_batch):
+        for prop, values_batch in zip(all_properties, all_values):
+            smiles = prop_smiles[prop]
+            for smi, value in zip(smiles, values_batch):
                 df_properties.loc[
                     (df_properties["smiles"] == smi)
                     & (df_properties["property"] == prop),

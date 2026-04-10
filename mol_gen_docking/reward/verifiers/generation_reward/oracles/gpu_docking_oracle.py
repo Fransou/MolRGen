@@ -1,22 +1,11 @@
 import json
 import os
 from pathlib import Path
-from typing import Generator, List, Literal, Optional, Tuple, Type, Union
+from typing import Any, Generator, List, Optional, Tuple, Union
 
 import ray
 from tdc.metadata import docking_target_info
 from tdc.utils import receptor_load
-
-# from rgfn.gfns.reaction_gfn.proxies.docking_proxy.gnina_wrapper import GninaRescorer
-from mol_gen_docking.reward.verifiers.generation_reward.oracles.docking_utils.docking_soft import (
-    AutoDockGPUDocking,
-    BaseDocking,
-    VinaDocking,
-)
-from mol_gen_docking.reward.verifiers.generation_reward.oracles.docking_utils.preparators import (
-    BasePreparator,
-    MeekoLigandPreparator,
-)
 
 
 def _chunks(lst: List[str], n: int) -> Generator[List[str], None, None]:
@@ -29,10 +18,6 @@ class DockingMoleculeGpuOracle:
     def __init__(
         self,
         path_to_data: str,
-        qv_dir: Optional[Union[Path, str]] = None,
-        preparator_class: Type[BasePreparator] = MeekoLigandPreparator,
-        vina_mode: str = "QuickVina2",
-        aggreggation_type: Literal["mean", "min", "cluster_min"] = "mean",
         gnina: bool = False,
         receptor_path: Optional[Union[Path, str]] = None,
         receptor_name: Optional[str] = None,
@@ -40,20 +25,13 @@ class DockingMoleculeGpuOracle:
         size: Optional[List[float]] = None,
         print_msgs: bool = True,
         failed_score: float = 0.0,
-        conformer_attempts: int = 1,
         n_conformers: int = 1,
-        docking_attempts: int = 10,
-        docking_batch_size: int = 1024,
-        exhaustiveness: int = 16,
-        n_gpu: int = 1,
-        gpu_ids: Optional[List[str]] = None,
-        n_cpu: Optional[int] = None,
+        docking_batch_size: int = 16,
+        docking_actor_pool: Optional[ray.util.ActorPool] = None,
+        **kwargs: Any,
     ):
         """
         Parameters:
-            qv_dir (Union[Path, str]): Directory containing the Vina executable.
-            preparator_class (Type[BasePreparator]): Class for preparing ligands. Default is MeekoLigandPreparator.
-            vina_mode (str): Vina-GPU-2.1 implementation to use. Options are "QuickVina2", "AutoDock-Vina", or "QuickVina-W". Default is "QuickVina2".
             gnina (bool): Whether to use GNINA for rescoring. Default is False.
             receptor_path (Optional[Union[Path, str]]): Path to the receptor file. Required if receptor_name is not provided.
             receptor_name (Optional[str]): Name of the receptor. Required if receptor_path is not provided.
@@ -61,17 +39,11 @@ class DockingMoleculeGpuOracle:
             size (Optional[List[float]]): Size of the docking box. If not provided, uses predefined sizes for known receptors.
             print_msgs (bool): Whether to print messages during docking. Default is False.
             failed_score (float): Score to assign when docking fails. Default is 0.0.
-            conformer_attempts (int): Number of attempts for conformer generation. Default is 20.
             n_conformers (int): Number of conformers to generate per molecule. Default is 1.
-            docking_attempts (int): Number of docking attempts per molecule. Default is 10.
-            docking_batch_size (int): Batch size for docking. Default is 25.
-            exhaustiveness (int): Exhaustiveness parameter for Vina. Default is 8000. Note: Minimum is 1000.
-            n_gpu (int): Number of GPUs to use. Default is 1.
-            n_cpu (Optional[int]): Number of CPUs to use. If None, uses all available CPUs.
+            docking_batch_size (int): Batch size for docking. Default is 16.
         """
 
         super().__init__()
-        self.aggregation_type = aggreggation_type
         if receptor_path is None and receptor_name is None:
             raise ValueError(
                 "Expected either receptor_path or receptor_name to be specified."
@@ -82,9 +54,7 @@ class DockingMoleculeGpuOracle:
             )
 
         if receptor_name is not None:
-            if receptor_name.endswith("docking") or receptor_name.endswith(
-                "docking_vina"
-            ):
+            if receptor_name.endswith("docking"):
                 pdbid = receptor_name.split("_")[0]
                 receptor_load(pdbid)
                 self.receptor_path = "./oracle/" + pdbid + ".pdbqt"
@@ -112,72 +82,14 @@ class DockingMoleculeGpuOracle:
         assert size is not None
         self.name = "[DOCKING]-" + receptor_name if receptor_name else receptor_path
 
-        self.vina_mode = vina_mode
-        self.qv_dir = qv_dir
         self.gnina = gnina
         self.size = size
         self.print_msgs = print_msgs
-        self.preparator_class = preparator_class
         self.failed_score = failed_score
-        self.conformer_attempts = conformer_attempts
         self.n_conformers = n_conformers
-        self.docking_attempts = docking_attempts
         self.batch_size = docking_batch_size
-        self.exhaustiveness = exhaustiveness
-        self.n_gpu = n_gpu
-        self.n_cpu = n_cpu
-
-        self.preparator = self.preparator_class(
-            conformer_attempts=self.conformer_attempts,
-            n_conformers=self.n_conformers,
-            num_cpus=self.n_cpu,
-        )
-        if self.qv_dir is not None:
-            vina_fullpath = os.path.realpath(f"{self.qv_dir}/{self.vina_mode}-GPU-2.1")
-        else:
-            vina_fullpath = self.vina_mode
-
-        self.docking_module_gpu: BaseDocking
-        if self.qv_dir:
-            self.docking_module_gpu = VinaDocking(
-                f"{vina_fullpath}/{self.vina_mode}-GPU-2-1",
-                receptor_file=self.receptor_path,
-                center_pos=self.center,
-                size=self.size,
-                n_conformers=self.n_conformers,
-                get_pose_str=False,
-                preparator=self.preparator,
-                timeout_duration=None,
-                debug=False,
-                print_msgs=self.print_msgs,
-                print_output=True,
-                gpu_ids=gpu_ids,
-                docking_attempts=self.docking_attempts,
-                additional_args={
-                    "thread": self.exhaustiveness,
-                    "opencl_binary_path": vina_fullpath,
-                    "num_modes": 1,
-                },
-            )
-            raise NotImplementedError
-        else:
-            self.docking_module_gpu = AutoDockGPUDocking(
-                self.vina_mode,
-                receptor_file=self.receptor_path,
-                n_conformers=self.n_conformers,
-                agg_type=self.aggregation_type,
-                get_pose_str=False,
-                preparator=self.preparator,
-                timeout_duration=None,
-                debug=True,
-                print_msgs=self.print_msgs,
-                print_output=False,
-                gpu_ids=gpu_ids,
-                docking_attempts=self.docking_attempts,
-                additional_args={
-                    "--nrun": self.exhaustiveness,
-                },
-            )
+        assert docking_actor_pool is not None
+        self.docking_actor_pool = docking_actor_pool
 
         # if self.gnina:
         #     self.gnina_rescorer = GninaRescorer(
@@ -188,17 +100,15 @@ class DockingMoleculeGpuOracle:
         #     )
 
     def dock_batch_qv2gpu(
-        self, smiles: List[str], gpu_ids: List[int] = [0]
+        self, smiles: List[str], output: Any
     ) -> Tuple[List[float | None], List[Optional[str]]]:
         """
-        Uses customized QuickVina2-GPU (Tang et al.) implementation to
+        Uses GPU docking implementation to
         calculate docking score against target of choice.
 
         Note: Failure at any point in the pipeline (reading molecule, pdbqt conversion,
             score calculation) returns self.failed_score for that molecule.
         """
-
-        output = self.docking_module_gpu(smiles, gpu_ids=gpu_ids)
         if output is None:
             raise ValueError("Failed to compute docking score")
         scores, docked_pdbqts = output
@@ -243,12 +153,27 @@ class DockingMoleculeGpuOracle:
             return all_best_scores, all_best_poses
 
     def __call__(self, smiles: List[str]) -> List[float]:
-        scores: List[float] = []
-        gpu_ids = ray.get_gpu_ids()
-        assert len(gpu_ids) >= 1, "No GPU available for docking."
+        """Compute docking scores for a list of SMILES strings.
 
-        for chunk in _chunks(smiles, self.batch_size):
-            scores_chunk, docked_pdbqts = self.dock_batch_qv2gpu(chunk, gpu_ids=gpu_ids)
+        Args:
+            smiles: List of SMILES strings to dock.
+
+        Returns:
+            List of docking scores corresponding to each SMILES.
+        """
+        scores: List[float] = []
+        outputs = list(
+            self.docking_actor_pool.map(
+                lambda a, v: a.dock_smis.remote(
+                    smi=v, receptor_file=self.receptor_path
+                ),
+                list(
+                    _chunks(smiles, self.batch_size),
+                ),
+            )
+        )
+        for chunk, output in zip(_chunks(smiles, self.batch_size), outputs):
+            scores_chunk, docked_pdbqts = self.dock_batch_qv2gpu(chunk, output)
             if scores_chunk is not None:
                 scores_chunk_float = [
                     self.failed_score if s is None else s for s in scores_chunk

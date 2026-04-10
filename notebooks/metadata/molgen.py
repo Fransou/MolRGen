@@ -46,6 +46,11 @@ MODEL_META = {
         "Chem.": False,
         "size": "229B",
     },
+    "RL-Molstral_": {
+        "thinking": True,
+        "Chem.": True,
+        "size": "128B",
+    },
     "RL-": {
         "thinking": True,
         "Chem.": True,

@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi_mcp import FastApiMCP
+from ray.actor import ActorClass, ActorProxy
 
 from mol_gen_docking.data.meeko_process import ReceptorProcess
 from mol_gen_docking.reward import (
@@ -29,15 +30,15 @@ logger.setLevel(logging.INFO)
 server_settings = MolecularVerifierServerSettings()
 server_settings.ray_init()
 
-RemoteRewardScorer: Any = ray.remote(MolecularVerifier)
+RemoteRewardScorer: ActorClass[MolecularVerifier] = ray.remote(MolecularVerifier)
+RemoteReceptorProcess: ActorClass[ReceptorProcess] = ray.remote(ReceptorProcess)
 
 server_settings_log = "Server settings:\n"
 for field_name, field_value in server_settings.model_dump().items():
     server_settings_log += f"  {field_name}: {field_value}\n"
 logger.info(server_settings_log)
 
-_reward_model = None
-_valid_reward_model = None
+_reward_model: None | ActorProxy[MolecularVerifier] = None
 
 
 def get_or_create_reward_actor() -> Any:
@@ -53,7 +54,7 @@ def get_or_create_reward_actor() -> Any:
     """
     global _reward_model
     global server_settings
-    if _reward_model is None or _reward_model.__ray_terminated__:
+    if _reward_model is None or _reward_model.__ray_terminated__:  # type: ignore
         _reward_model = RemoteRewardScorer.remote(
             server_settings.to_molecular_verifier_config()
         )
@@ -93,7 +94,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     app.state.reward_model = get_or_create_reward_actor()
     app.state.receptor_processor = (
-        ReceptorProcess(data_path=server_settings.data_path)
+        RemoteReceptorProcess.options(max_concurrency=4).remote(
+            data_path=server_settings.data_path
+        )
         if server_settings.docking_oracle == "autodock_gpu"
         else None
     )
