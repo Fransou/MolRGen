@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Literal, Optional
 
 import ray
-from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 from mol_gen_docking.reward import (
@@ -171,25 +170,6 @@ class MolecularVerifierServerSettings(BaseSettings):
     ray_port: Optional[int] = None
     ray_tmp_dir: Optional[str] = None
 
-    @field_validator("generation_verifier_ncpus")
-    @classmethod
-    def cap_generation_verifier_ncpus(cls, v: int) -> int:
-        """Validate and cap the generation_verifier_ncpus to available cluster resources.
-
-        Ensures that the requested number of CPUs for generation verification does not
-        exceed the available CPUs in the Ray cluster. Reserves 2 CPUs for system overhead.
-
-        Args:
-            v (int): The requested number of CPU cores for generation verification tasks.
-
-        Returns:
-            int: The capped number of CPUs, limited to (total_cluster_cpus - 2).
-                Returns the requested value if it's less than the maximum available,
-                otherwise returns the maximum available after reserving 2 CPUs.
-        """
-        n_cpus_max = ray.cluster_resources().get("CPU", 0) - 2
-        return v if v < n_cpus_max else n_cpus_max
-
     def __post_init__(self) -> None:
         """Validate all settings after initialization.
 
@@ -278,6 +258,11 @@ class MolecularVerifierServerSettings(BaseSettings):
             ValueError: If any of the referenced configuration paths don't exist.
                 This can happen if data_path or reaction_matrix_path are invalid.
         """
+        self.ray_init()
+
+        n_cpus_max = ray.cluster_resources().get("CPU", 0) - 2
+        self.generation_verifier_ncpus = min(n_cpus_max, self.generation_verifier_ncpus)
+
         # Create oracle kwargs from server settings
         oracle_kwargs: DockingGPUConfigModel | PyscreenerConfigModel
         if self.docking_oracle == "pyscreener":
