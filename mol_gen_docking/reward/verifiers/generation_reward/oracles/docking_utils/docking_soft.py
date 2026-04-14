@@ -1,7 +1,7 @@
 # Adapted from code in PyVina https://github.com/Pixelatory/PyVina
 # Copyright (c) 2024 Nicholas Aksamit
 # Licensed under the MIT License
-
+import copy
 import hashlib
 import logging
 import os
@@ -10,13 +10,12 @@ import shutil
 import subprocess
 import time
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Literal, Optional, Union
 
 import ray
+from pydantic import BaseModel, Field
 from rdkit import Chem
 from ringtail.parsers import parse_single_dlg
-
-DOCKING_OUTPUT = None | Tuple[List[float | None], List[str | None]]
 
 
 def make_dir(rel_path: str, *args: Any, **kwargs: Any) -> None:
@@ -154,6 +153,20 @@ class TimedProfiler:
         return self._average
 
 
+class DockingOutput(BaseModel):
+    """Represents docking output."""
+
+    score: float = Field(default=0.0, description="Docking score.")
+    pose: Optional[str] = Field(
+        default=None,
+        description="Optional string representation of the docked pose (e.g., PDBQT format).",
+    )
+    success: bool = Field(..., description="Whether the docking was successful.")
+    smi: str = Field(
+        ..., description="The SMILES string corresponding to this docking output."
+    )
+
+
 class BaseDocking:  # Keep base class fo BC and future softwares
     """Base class for docking implementations."""
 
@@ -230,7 +243,7 @@ class BaseDocking:  # Keep base class fo BC and future softwares
             List of booleans indicating whether each ligand was prepared successfully.
         """
         # Perform ligand preparation and save to proper path (tmp/non-tmp ligand dir)
-        smis = list(ligand_paths_by_smiles.keys())
+        smis = copy.deepcopy(list(ligand_paths_by_smiles.keys()))
         ligand_paths = list(ligand_paths_by_smiles.values())
         assert self.preparator is not None
         if self.debug:
@@ -282,7 +295,7 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         ligand_paths_by_smiles: Dict[str, List[str]],
         output_dir_path: str,
         receptor_file: str,
-    ) -> DOCKING_OUTPUT:
+    ) -> List[DockingOutput]:
         """Perform docking on a sub-module (GPU-specific) batch.
 
         Args:
@@ -334,7 +347,9 @@ class BaseDocking:  # Keep base class fo BC and future softwares
             receptor_file=receptor_file,
         )
 
-    def _batched_docking(self, smis: List[str], receptor_file: str) -> DOCKING_OUTPUT:
+    def _batched_docking(
+        self, smis: List[str], receptor_file: str
+    ) -> List[DockingOutput]:
         """Perform batched docking on a list of SMILES.
 
         Args:
@@ -380,7 +395,7 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         output_dir_path: str,
         gpu_ids: List[int],
         receptor_file: str,
-    ) -> DOCKING_OUTPUT:
+    ) -> List[DockingOutput]:
         """Run batched docking on multiple GPUs.
 
         Args:
@@ -401,26 +416,27 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         raise NotImplementedError
 
     def dock_smis(
-        self, smi: Union[str, List[str]], receptor_file: str
-    ) -> DOCKING_OUTPUT:
+        self, smi: List[str], receptor_file: str
+    ) -> List[DockingOutput] | None:
         """
         Parameters:
         - smi: SMILES strings to perform docking. A single string activates single-ligand docking mode, while \
             multiple strings utilizes batched docking.
         """
         smi_list: List[str] = []
-        if type(smi) is str:
-            smi_list = [smi]
-        elif type(smi) is list:
-            for i in range(len(smi)):
-                mol = Chem.MolFromSmiles(smi[i])
-                if mol is not None:
-                    smi[i] = Chem.MolToSmiles(mol, isomericSmiles=True, canonical=True)
-                smi_list = smi
-        else:
-            raise Exception("smi must be a string or a list of strings")
+        for i in range(len(smi)):
+            mol = Chem.MolFromSmiles(smi[i])
+            if mol is not None:
+                smi_list.append(
+                    Chem.MolToSmiles(mol, isomericSmiles=True, canonical=True)
+                )
+            else:
+                smi_list.append(smi[i])
         if len(smi_list) > 0:
-            return self._batched_docking(smis=smi_list, receptor_file=receptor_file)
+            out = self._batched_docking(smis=smi_list, receptor_file=receptor_file)
+            for s, d in zip(smi, out):
+                d.smi = s
+            return out
         else:
             return None
 
@@ -491,7 +507,7 @@ class AutoDockGPUDocking(BaseDocking):
         output_dir_path: str,
         gpu_ids: List[int],
         receptor_file: str,
-    ) -> DOCKING_OUTPUT:
+    ) -> List[DockingOutput]:
         """Run batched docking on multiple GPUs for AutoDock GPU.
 
         Args:
@@ -542,9 +558,8 @@ class AutoDockGPUDocking(BaseDocking):
         if output_paths == []:
             error_msg = f"Critical error encountered, no output path given for smi list:\n {smis} \n"
             error_msg += f"### ### number of preprocessed smiles: {len(os.listdir(ligand_dir_path))}"
-
             self.logger.error(error_msg)
-        # Gather binding scores
+
         binding_scores_dict: Dict[str, float | None] = {}
         # Move all output files to a TempDir
         move_files_from_dir(ligand_dir_path, output_dir_path, include_only=output_paths)
@@ -552,30 +567,19 @@ class AutoDockGPUDocking(BaseDocking):
             os.path.abspath(f"{output_dir_path}/" + os.path.basename(file))
             for file in output_paths
         ]
+
+        binding_results_dict: Dict[str, DockingOutput] = {}
+        ligand_identifier_to_smi = {
+            v[0].split("/")[-1].split(".")[0]: smi
+            for smi, v in ligand_paths_by_smiles.items()
+            if len(v) > 0
+        }
         for file in output_paths:
+            binding_score_val: float | None
             try:
                 ligand_dict = parse_single_dlg(file)
                 identifier = ligand_dict["ligname"]
-                binding_score_val: float | None
-                if self.agg_type == "min":
-                    binding_score_val = min(ligand_dict["scores"])
-                elif self.agg_type == "mean":
-                    binding_score_val = sum(ligand_dict["scores"]) / len(
-                        ligand_dict["scores"]
-                    )
-                elif self.agg_type == "cluster_min":
-                    cluster_sizes: Dict[str, int] = ligand_dict["cluster_sizes"]
-                    largest_cluster = max(cluster_sizes, key=cluster_sizes.get)  # type: ignore
-                    binding_score_val = min(
-                        [
-                            score
-                            for c, score in zip(
-                                ligand_dict["cluster_list"], ligand_dict["scores"]
-                            )
-                            if c == largest_cluster
-                        ]
-                    )
-            except ZeroDivisionError:
+            except ZeroDivisionError:  # We catch the identifier
                 with open(file, "rb") as fp:
                     for line in fp.readlines():
                         line_str: str = line.decode("utf-8")
@@ -586,39 +590,48 @@ class AutoDockGPUDocking(BaseDocking):
                                 .split("/")[-1]
                                 .split(".")[0]
                                 .strip()
-                            )  # remove path and file extension
+                            )
                             break
                 binding_score_val = 0.0
+            smi = ligand_identifier_to_smi[identifier]
+            if self.agg_type == "min":
+                binding_score_val = min(ligand_dict["scores"])
+            elif self.agg_type == "mean":
+                binding_score_val = sum(ligand_dict["scores"]) / len(
+                    ligand_dict["scores"]
+                )
+            elif self.agg_type == "cluster_min":
+                cluster_sizes: Dict[str, int] = ligand_dict["cluster_sizes"]
+                largest_cluster = max(cluster_sizes, key=cluster_sizes.get)  # type: ignore
+                binding_score_val = min(
+                    [
+                        score
+                        for c, score in zip(
+                            ligand_dict["cluster_list"], ligand_dict["scores"]
+                        )
+                        if c == largest_cluster
+                    ]
+                )
             # We cap the binding score to a maximum value  of 0.0 kcal/mol
             binding_score_val = (
                 min(binding_score_val, 0.0) if binding_score_val is not None else None
             )
-            binding_scores_dict[identifier] = binding_score_val
-        if self.get_pose_str:
-            binding_poses = []
-            for i in range(len(output_paths)):
-                binding_poses.append(self._get_output_pose(output_paths[i]))
-        else:
-            binding_poses = [None] * len(output_paths)
-        binding_scores_per_smi = {
-            smi: [
-                binding_scores_dict.get(os.path.basename(p).split(".")[0], 0)
-                for p in paths
-            ]
-            for smi, paths in ligand_paths_by_smiles.items()
-        }
-        binding_scores_: Dict[str, float | None] = {}
-        for smi, scores in binding_scores_per_smi.items():
-            scores = [s for s in scores if s is not None]
-            if len(scores) > 0:
-                binding_scores_[smi] = min(scores)  # type: ignore
-            else:
-                binding_scores_[smi] = None
-        binding_scores = (
-            [binding_scores_.get(smi, 0) for smi in smis],
-            binding_poses,
-        )
-        return binding_scores
+            assert smi not in binding_scores_dict
+            binding_results_dict[smi] = DockingOutput(
+                score=binding_score_val if binding_score_val is not None else 0.0,
+                smi=smi,
+                pose=self._get_output_pose(file) if self.get_pose_str else None,
+                success=binding_score_val is not None,
+            )
+        for smi in smis:
+            if smi not in binding_results_dict:
+                binding_results_dict[smi] = DockingOutput(
+                    score=0.0,
+                    smi=smi,
+                    pose=None,
+                    success=False,
+                )
+        return [binding_results_dict[smi] for smi in smis]
 
     @staticmethod
     def _get_output_pose(output_path: str) -> Union[str, None]:

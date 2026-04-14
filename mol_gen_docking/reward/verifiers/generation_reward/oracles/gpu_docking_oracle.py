@@ -1,23 +1,31 @@
+import copy
 import json
 import os
 from pathlib import Path
 from typing import Any, Generator, List, Optional, Tuple, Union
 
 import ray
+from ray.actor import ActorProxy
 from tdc.metadata import docking_target_info
 from tdc.utils import receptor_load
+
+from mol_gen_docking.reward.verifiers.generation_reward.oracles.docking_utils.docking_soft import (
+    BaseDocking,
+    DockingOutput,
+)
 
 
 def _chunks(lst: List[str], n: int) -> Generator[List[str], None, None]:
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
-        yield lst[i : i + n]
+        yield lst[i : min(i + n, len(lst))]
 
 
 class DockingMoleculeGpuOracle:
     def __init__(
         self,
         path_to_data: str,
+        docking_actor_pool: List[ActorProxy[BaseDocking]] = [],
         gnina: bool = False,
         receptor_path: Optional[Union[Path, str]] = None,
         receptor_name: Optional[str] = None,
@@ -27,7 +35,6 @@ class DockingMoleculeGpuOracle:
         failed_score: float = 0.0,
         n_conformers: int = 1,
         docking_batch_size: int = 16,
-        docking_actor_pool: Optional[ray.util.ActorPool] = None,
         **kwargs: Any,
     ):
         """
@@ -88,7 +95,6 @@ class DockingMoleculeGpuOracle:
         self.failed_score = failed_score
         self.n_conformers = n_conformers
         self.batch_size = docking_batch_size
-        assert docking_actor_pool is not None
         self.docking_actor_pool = docking_actor_pool
 
         # if self.gnina:
@@ -100,7 +106,7 @@ class DockingMoleculeGpuOracle:
         #     )
 
     def dock_batch_qv2gpu(
-        self, smiles: List[str], output: Any
+        self, smiles: List[str], output: List[DockingOutput] | None
     ) -> Tuple[List[float | None], List[Optional[str]]]:
         """
         Uses GPU docking implementation to
@@ -111,27 +117,29 @@ class DockingMoleculeGpuOracle:
         """
         if output is None:
             raise ValueError("Failed to compute docking score")
-        scores, docked_pdbqts = output
-        assert len(scores) == len(smiles)
+        scores = [out.score if out.success else None for out in output]
+        docked_pdbqts = [out.pose for out in output]
 
         if self.n_conformers == 1 or (not scores or not docked_pdbqts):
+            if len(scores) != len(smiles):
+                raise ValueError(
+                    f"Expected output length {len(scores)} to match input SMILES length {len(smiles)}."
+                    + "\n"
+                    + f"Original smis: {smiles}"
+                    + "\n"
+                    + f"Docked smis: {[out.smi for out in output]}"
+                )
             return scores, docked_pdbqts
 
         else:
             all_best_scores: List[None | float] = []
             all_best_poses: List[None | str] = []
             # if self.gnina:
-            #     if self.print_msgs:
-            #         print("Rescoring with gnina...")
             #     pose_batches = _chunks(docked_pdbqts, self.n_conformers)
             #     for batch in pose_batches:
             #         score, pose = self.gnina_rescorer(list(batch))
             #         all_best_scores.append(score * -1)  # gnina returns a positive score
             #         all_best_poses.append(pose)
-            #
-            #     if self.print_msgs:
-            #         print("Rescoring complete.")
-            #
             # else:  # we're just ranking the poses by qv2gpu score
             score_pose_batches = _chunks(
                 list(zip(scores, docked_pdbqts)),  # type: ignore
@@ -162,17 +170,18 @@ class DockingMoleculeGpuOracle:
             List of docking scores corresponding to each SMILES.
         """
         scores: List[float] = []
-        outputs = list(
-            self.docking_actor_pool.map(
-                lambda a, v: a.dock_smis.remote(
-                    smi=v, receptor_file=self.receptor_path
-                ),
-                list(
-                    _chunks(smiles, self.batch_size),
-                ),
+        smi_chunks = list(_chunks(smiles, self.batch_size))
+        job_outputs = []
+        for i, chunk in enumerate(smi_chunks):
+            job_outputs.append(
+                self.docking_actor_pool[  # type: ignore
+                    i % len(self.docking_actor_pool)
+                ].dock_smis.remote(
+                    smi=copy.deepcopy(chunk), receptor_file=self.receptor_path
+                )
             )
-        )
-        for chunk, output in zip(_chunks(smiles, self.batch_size), outputs):
+        outputs: List[None | List[DockingOutput]] = ray.get(job_outputs)
+        for chunk, output in zip(smi_chunks, outputs):
             scores_chunk, docked_pdbqts = self.dock_batch_qv2gpu(chunk, output)
             if scores_chunk is not None:
                 scores_chunk_float = [
