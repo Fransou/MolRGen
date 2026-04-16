@@ -14,7 +14,7 @@ MODEL_META = {
         "Chem.": True,
     },
     "ChemDFM-R": {
-        "thinking": True,
+        "thinking": False,
         "Chem.": True,
     },
     "-R1-": {
@@ -31,6 +31,10 @@ MODEL_META = {
     },
     "gemma-3": {
         "thinking": False,
+        "Chem.": False,
+    },
+    "gemma-4": {
+        "thinking": True,
         "Chem.": False,
     },
     "gpt-oss": {
@@ -51,8 +55,8 @@ MODEL_META = {
         "Chem.": True,
         "size": "128B",
     },
-    "RL-": {
-        "thinking": True,
+    "RL-Mistral": {
+        "thinking": False,
         "Chem.": True,
     },
 }

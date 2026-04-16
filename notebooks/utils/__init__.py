@@ -10,7 +10,7 @@ from .molprop_utils import load_molprop_results
 from .pandas_to_latex import PandasTableFormatter
 from .synthesis_utils import load_synth_results
 
-N_COLORS = 14
+N_COLORS = 16
 palette = sns.husl_palette(
     n_colors=N_COLORS,
     s=0.95,  # Saturation
@@ -20,29 +20,29 @@ CMAP_MODELS = {
     # Chem models — muted reds
     "ChemDFM-R": palette[0],
     "ChemDFM-v2.0": palette[1],
-    "RL-Mistral": palette[-1],
-    "RL-Mistral-100": palette[-2],
-    "RL-Molstral": palette[-3],
     "ether0": palette[2],
+    "RL-Mistral": palette[3],
+    "RL-Molstral": palette[4],
 }
 
 CMAP_MODELS.update(
     {
         # Reasoning models — cool blues / teals
-        "MiniMax-M2": palette[4],
-        "Qwen3": palette[5],
-        "Qwen3-Next": palette[6],
-        "gpt-oss": palette[7],
-        "R1-Llama": palette[8],
-        "R1-Qwen": palette[9],
+        "MiniMax-M2": palette[6],
+        "Qwen3": palette[7],
+        "Qwen3-Next": palette[8],
+        "gpt-oss": palette[9],
+        "R1-Llama": palette[10],
+        "R1-Qwen": palette[11],
     }
 )
 
 CMAP_MODELS.update(
     {
         # Non-reasoning models — warm greens / golds
-        "Llama-3.3": palette[10],
-        "gemma-3": palette[11],
+        "Llama-3.3": palette[13],
+        "gemma-3": palette[14],
+        "gemma-4": palette[15],
     }
 )
 MARKER_MODELS = {
@@ -63,6 +63,7 @@ MARKER_MODELS = {
     # Non-reasoning general models
     "Llama-3.3": "p",
     "gemma-3": "*",
+    "gemma-4": "D",
 }
 
 # Models to highlight in plots
