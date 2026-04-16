@@ -578,6 +578,30 @@ class AutoDockGPUDocking(BaseDocking):
             binding_score_val: float | None
             try:
                 ligand_dict = parse_single_dlg(file)
+                if self.agg_type == "min":
+                    binding_score_val = min(ligand_dict["scores"])
+                elif self.agg_type == "mean":
+                    binding_score_val = sum(ligand_dict["scores"]) / len(
+                        ligand_dict["scores"]
+                    )
+                elif self.agg_type == "cluster_min":
+                    cluster_sizes: Dict[str, int] = ligand_dict["cluster_sizes"]
+                    largest_cluster = max(cluster_sizes, key=cluster_sizes.get)  # type: ignore
+                    binding_score_val = min(
+                        [
+                            score
+                            for c, score in zip(
+                                ligand_dict["cluster_list"], ligand_dict["scores"]
+                            )
+                            if c == largest_cluster
+                        ]
+                    )
+                # We cap the binding score to a maximum value  of 0.0 kcal/mol
+                binding_score_val = (
+                    min(binding_score_val, 0.0)
+                    if binding_score_val is not None
+                    else None
+                )
                 identifier = ligand_dict["ligname"]
             except ZeroDivisionError:  # We catch the identifier
                 with open(file, "rb") as fp:
@@ -594,28 +618,6 @@ class AutoDockGPUDocking(BaseDocking):
                             break
                 binding_score_val = 0.0
             smi = ligand_identifier_to_smi[identifier]
-            if self.agg_type == "min":
-                binding_score_val = min(ligand_dict["scores"])
-            elif self.agg_type == "mean":
-                binding_score_val = sum(ligand_dict["scores"]) / len(
-                    ligand_dict["scores"]
-                )
-            elif self.agg_type == "cluster_min":
-                cluster_sizes: Dict[str, int] = ligand_dict["cluster_sizes"]
-                largest_cluster = max(cluster_sizes, key=cluster_sizes.get)  # type: ignore
-                binding_score_val = min(
-                    [
-                        score
-                        for c, score in zip(
-                            ligand_dict["cluster_list"], ligand_dict["scores"]
-                        )
-                        if c == largest_cluster
-                    ]
-                )
-            # We cap the binding score to a maximum value  of 0.0 kcal/mol
-            binding_score_val = (
-                min(binding_score_val, 0.0) if binding_score_val is not None else None
-            )
             assert smi not in binding_scores_dict
             binding_results_dict[smi] = DockingOutput(
                 score=binding_score_val if binding_score_val is not None else 0.0,
