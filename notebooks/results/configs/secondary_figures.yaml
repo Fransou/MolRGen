@@ -10,22 +10,22 @@ data:
     - "MiniMax-M2_"
     - "Qwen3-Next-80B-A3B-Thinking_"
     - "RL-Mistral-24B_"
-    - "RL-Mistral-24B-100_"
+    - "RL-Molstral_"
 
 plot:
   fingerprints:
-#    - "ecfp4-2048"
-#    - "ecfp6-2048"
-#    - "maccs"
+    - "ecfp4-2048"
+    - "ecfp6-2048"
+    - "maccs"
 #    - "rdkit"
 #    - "Avalon"
-    - "Gobbi2d"
+#    - "Gobbi2d"
   legend_fingerprint: "Avalon"  # Only this fingerprint gets a legend
   cols_vals:
-    - 5
-    - 25
+    - 4
+    - 16
   x_vals: null
-  row: "n_rollout"
+  row: "n_rollout_per_k"
   col: "k"
   x: "sim"
   column_name: "k"

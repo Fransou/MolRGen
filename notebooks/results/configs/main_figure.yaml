@@ -10,7 +10,7 @@ data:
     - "MiniMax-M2_"
     - "Qwen3-Next-80B-A3B-Thinking_"
     - "RL-Mistral-24B_"
-    - "RL-Mistral-24B-100_"
+    - "RL-Molstral_"
   remove_model:
     - "gpt-oss"
     - "R1-Llama"
@@ -19,11 +19,11 @@ data:
 plot:
   fp_name: "ecfp6-2048"
   cols_vals:
-    - 5
-    - 10
-    - 25
+    - 4
+    - 8
+    - 16
   x_vals: null
-  row: "n_rollout"
+  row: "n_rollout_per_k"
   col: "k"
   x: "sim"
   column_name: "k"

@@ -105,9 +105,11 @@ def plot_div_topk(
     fp_name: str,
     legend: bool = False,
     cols_vals: list[float] = [10, 30],
+    row_vals: list[float] = [1.5, 2, 4],
     x_vals: list[float] | None = None,
-    row: str = "n_rollout",
+    row: str = "n_rollout_per_k",
     rollouts: list[int] = [32, 64, 128],
+    rollouts_is_frac: bool = True,
     col: str = "k",
     x: str = "sim",
     column_name: str = "k",
@@ -138,7 +140,7 @@ def plot_div_topk(
             data,
             sizes=1,
             alpha=0.7,
-            linewidth=1.2,
+            linewidth=1.0,
             legend=False,
             **kwargs,
         )
@@ -178,12 +180,20 @@ def plot_div_topk(
                 **kwargs,
             )
 
+    if row == "n_rollout_per_k":
+        rollouts = np.unique([int(k * roll) for k in cols_vals for roll in row_vals])
+
     div_clus_df = get_top_k_div_df(
         df[df.prompt_id.isin(sub_sample_prompts[:])],
         fp_name=fp_name,
         rollouts=rollouts,
         **kwargs,
     )
+
+    if row == "n_rollout_per_k":
+        div_clus_df["n_rollout_per_k"] = div_clus_df["n_rollout"] / div_clus_df["k"]
+        div_clus_df = div_clus_df[div_clus_df["n_rollout_per_k"].isin(row_vals)]
+
     if cols_vals is not None:
         div_clus_df = div_clus_df[div_clus_df[col].isin(cols_vals)]
     if x_vals is not None:
@@ -202,10 +212,11 @@ def plot_div_topk(
     g.set_axis_labels("", "")
     # set x axis log
     g.set(xscale="log")
-
-    g.set_titles(
-        row_template="$n_r$={row_name}", col_template=column_name + "={col_name}"
-    )
+    if row == "n_rollout_per_k":
+        row_temp = "$n_r/k$={row_name}"
+    else:
+        row_temp = "$n_r$={row_name}"
+    g.set_titles(row_template=row_temp, col_template=column_name + "={col_name}")
     g.fig.supxlabel(xlabel, y=0.0, x=xlabel_x)
     g.fig.supylabel("Diversity-Aware Top-k Score", x=ylabel_x)
 
