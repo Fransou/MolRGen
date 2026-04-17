@@ -7,10 +7,11 @@ paths:
 
 data:
   subsample_models:
-    - "MiniMax-M2_"
-    - "Qwen3-Next-80B-A3B-Thinking_"
-    - "RL-Mistral-24B_"
-    - "RL-Molstral_"
+    - "MiniMax-M2"
+    - "Qwen3-Next-80B-A3B-Thinking"
+    - "RL-Mistral-24B"
+    - "RL-Molstral"
+    - "gemma-4-31B-it"
   remove_model:
     - "gpt-oss"
     - "R1-Llama"
