@@ -2,7 +2,7 @@
 
 All queries to the Molecular Verifier server and its responses follow specific formats defined using Pydantic models. Below we outline the expected structure for both requests and responses.
 
-::: mol_gen_docking.server_utils.utils
+::: molrgen.server_utils.utils
     handler: python
     options:
         show_root_heading: false

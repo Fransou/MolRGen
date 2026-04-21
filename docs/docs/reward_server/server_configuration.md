@@ -28,7 +28,7 @@ DOCKING_ORACLE=autodock_gpu DATA_PATH=./data uvicorn ...
 
 ## Server Configuration
 
-::: mol_gen_docking.server_utils.server_setting
+::: molrgen.server_utils.server_setting
     handler: python
     options:
         show_root_heading: false

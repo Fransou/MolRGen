@@ -28,7 +28,7 @@ source $HOME/OpenRLHF/bin/activate
 
 ray start --head --node-ip-address 0.0.0.0
 
-python -m mol_gen_docking.fast_api_reward_server --data-path $SLURM_TMPDIR/$DATASET > logs/reward_model_$SLURM_JOB_ID.out &
+python -m molrgen.fast_api_reward_server --data-path $SLURM_TMPDIR/$DATASET > logs/reward_model_$SLURM_JOB_ID.out &
 sleep 15
 
 wandb offline

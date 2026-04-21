@@ -13,7 +13,7 @@ To start the server with MCP support:
 ```bash
 export DOCKING_ORACLE=autodock_gpu
 export DATA_PATH=data
-python mol_gen_docking/server_mcp.py
+python molrgen/server_mcp.py
 ```
 
 You should see output indicating both FastAPI and MCP server initialization:

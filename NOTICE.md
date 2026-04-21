@@ -1,7 +1,7 @@
-MolGenDocking
-Copyright (c) 2024 MolGenDocking Contributors
+MolRGen
+Copyright (c) 2024 MolRGen Contributors
 
-This product includes software developed by the MolGenDocking project.
+This product includes software developed by the MolRGen project.
 
 ===============================================================================
 
@@ -9,8 +9,8 @@ This product includes code adapted from PyVina (https://github.com/Pixelatory/Py
 which is licensed under the MIT License.
 
 The following files contain code adapted from PyVina:
-- mol_gen_docking/reward/verifiers/generation_reward/oracles/docking_utils/preparators.py
-- mol_gen_docking/reward/verifiers/generation_reward/oracles/docking_utils/docking_soft.py
+- molrgen/reward/verifiers/generation_reward/oracles/docking_utils/preparators.py
+- molrgen/reward/verifiers/generation_reward/oracles/docking_utils/docking_soft.py
 
 PyVina License:
 ---------------

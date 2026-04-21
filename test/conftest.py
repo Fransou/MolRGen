@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 import requests
 
-from mol_gen_docking.utils.property_utils import (
+from molrgen.utils.property_utils import (
     CLASSICAL_PROPERTIES_NAMES,
 )
 
@@ -367,7 +367,7 @@ def uvicorn_server(
             SERVER_HOST,
             "--port",
             str(SERVER_PORT),
-            "mol_gen_docking.server:app",
+            "molrgen.server:app",
         ],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

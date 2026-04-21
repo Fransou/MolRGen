@@ -31,7 +31,7 @@ pytest test/test_rewards/test_docking_API.py --accelerator=gpu
 # Launch server
 export docking_oracle=autodock_gpu
 export scorer_exhaustiveness=4
-uvicorn --host 0.0.0.0 --port 5001 mol_gen_docking.server:app &
+uvicorn --host 0.0.0.0 --port 5001 molrgen.server:app &
 sleep 10
 
 pytest test/test_rewards/test_docking_server_autodock_gpu.py -x -s --accelerator gpu

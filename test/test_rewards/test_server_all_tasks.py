@@ -13,7 +13,7 @@ from typing import Any, Dict, List
 import pytest
 import requests
 
-from mol_gen_docking.server_utils.utils import MolecularVerifierServerResponse
+from molrgen.server_utils.utils import MolecularVerifierServerResponse
 
 logger = logging.getLogger(__name__)
 

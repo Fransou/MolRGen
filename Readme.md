@@ -30,7 +30,7 @@ docker pull fransou/molgendata:latest
 ```bash
 export DOCKING_ORACLE=autodock_gpu
 export DATA_PATH=data
-uvicorn --host 0.0.0.0 --port 8000 mol_gen_docking.server:app
+uvicorn --host 0.0.0.0 --port 8000 molrgen.server:app
 ```
 
 ### Example API Call

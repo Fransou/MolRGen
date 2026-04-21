@@ -36,7 +36,7 @@ Answers are considered invalid (reward = 0.0) if:
 
 
 
-::: mol_gen_docking.reward.verifiers.mol_prop_reward.mol_prop_verifier_pydantic_model
+::: molrgen.reward.verifiers.mol_prop_reward.mol_prop_verifier_pydantic_model
     handler: python
     heading_level: 3
     options:
@@ -45,7 +45,7 @@ Answers are considered invalid (reward = 0.0) if:
             - MolPropVerifierConfigModel
 
 
-::: mol_gen_docking.reward.verifiers.mol_prop_reward.input_metadata
+::: molrgen.reward.verifiers.mol_prop_reward.input_metadata
     handler: python
     heading_level: 3
     options:
@@ -53,7 +53,7 @@ Answers are considered invalid (reward = 0.0) if:
         members:
             - MolPropVerifierInputMetadataModel
 
-::: mol_gen_docking.reward.verifiers.mol_prop_reward.mol_prop_verifier_pydantic_model
+::: molrgen.reward.verifiers.mol_prop_reward.mol_prop_verifier_pydantic_model
     handler: python
     heading_level: 3
     options:
@@ -62,7 +62,7 @@ Answers are considered invalid (reward = 0.0) if:
             - MolPropVerifierOutputModel
             - MolPropVerifierMetadataModel
 
-::: mol_gen_docking.reward.verifiers.mol_prop_reward.mol_prop_verifier
+::: molrgen.reward.verifiers.mol_prop_reward.mol_prop_verifier
     handler: python
     heading_level: 3
     options:

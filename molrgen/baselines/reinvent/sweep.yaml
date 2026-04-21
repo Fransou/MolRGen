@@ -1,0 +1,26 @@
+program: molrgen/baselines/reinvent/rl_opt.py
+method: grid
+metric:
+  goal: maximize
+  name: train/reward
+parameters:
+  model_name:
+    values: [results/Franso-reinvent_10M/checkpoint-28206]
+  batch_size:
+    values: [32,64]
+  sigma:
+    values: [1]
+  train_on_beams:
+    values: [0, 1]
+  generation_config:
+    values: [
+      '{}',
+      '{"num_beams": 2}',
+      '{"num_beams": 4}',
+      '{"num_beams": 8}',
+      '{"num_beams": 16}',
+      '{"num_beams": 32}',
+      '{"num_beams": 64}',
+    ]
+  id_obj:
+    values: [0]

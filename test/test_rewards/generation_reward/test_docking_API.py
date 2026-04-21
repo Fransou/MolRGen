@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 import torch
 
-from mol_gen_docking.data.meeko_process import ReceptorProcess
-from mol_gen_docking.reward import (
+from molrgen.data.meeko_process import ReceptorProcess
+from molrgen.reward import (
     GenerationVerifierConfigModel,
     MolecularVerifier,
     MolecularVerifierConfigModel,

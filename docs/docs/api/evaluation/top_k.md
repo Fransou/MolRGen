@@ -19,7 +19,7 @@ The **top-k metric** is a standard evaluation metric for molecular generation ta
 ### Basic Usage with SMILES
 
 ```python
-from mol_gen_docking.evaluation.top_k import top_k
+from molrgen.evaluation.top_k import top_k
 
 # List of generated molecules as SMILES
 smiles = [
@@ -42,7 +42,7 @@ print(f"Top-2 score: {metric}")
 ### Using RDKit Mol Objects
 
 ```python
-from mol_gen_docking.evaluation.top_k import top_k
+from molrgen.evaluation.top_k import top_k
 from rdkit import Chem
 
 # Convert to Mol objects
@@ -70,14 +70,14 @@ print(metric)
 
 ## Function Reference
 
-::: mol_gen_docking.evaluation.top_k
+::: molrgen.evaluation.top_k
     options:
         show_root_toc_entry: false
         heading_level: 3
 
 ## Benchmark Context
 
-In the MolGenDocking project, the top-k metric is used to evaluate molecular generation models on raw-quality without diversity constraints.
+In the MolRGen project, the top-k metric is used to evaluate molecular generation models on raw-quality without diversity constraints.
 We assess how well a model can generate multiple high-scoring molecules, possibly from a same chemical serie.
 
 See [Diversity-Aware Top-k](diversity_aware_top_k.md) for a variant that also enforces chemical diversity.

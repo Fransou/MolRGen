@@ -18,7 +18,7 @@ export DATA_PATH=data
 Start the server:
 
 ```bash
-uvicorn --host 0.0.0.0 --port 8000 mol_gen_docking.server:app
+uvicorn --host 0.0.0.0 --port 8000 molrgen.server:app
 ```
 
 You should see:
@@ -32,7 +32,7 @@ INFO:     Application startup complete
 To start the server with MCP (Model Context Protocol) support:
 
 ```bash
-python mol_gen_docking/server_mcp.py
+python molrgen/server_mcp.py
 ```
 
 ## Basic Usage

@@ -60,13 +60,13 @@ export docking_oracle=autodock_gpu
 export scorer_exhaustiveness=4
 
 if [ "$DATASET" == "molgendata" ]; then
-    python -m mol_gen_docking.score_completions \
+    python -m molrgen.score_completions \
       --iter $SLURM_ARRAY_TASK_ID \
       --input_file $CONFIG \
       --batch_size 1024 \
       --mol-generation
 else
-    python -m mol_gen_docking.score_completions \
+    python -m molrgen.score_completions \
       --iter $SLURM_ARRAY_TASK_ID \
       --input_file $CONFIG \
       --batch_size 1024

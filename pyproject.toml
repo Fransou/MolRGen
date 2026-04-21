@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mol_gen_docking"
+name = "molrgen"
 version = "2025.8.4"
 dependencies = [
     "torch>=2.6.0",
@@ -58,4 +58,4 @@ disable_error_code = ["type-arg"]
 plugins = ["pydantic.mypy"]
 
 [tool.hatch.build.targets.wheel]
-    packages = ["mol_gen_docking"]
+    packages = ["molrgen"]

@@ -1,6 +1,6 @@
-# MolGenDocking: Molecular Generation and Docking Benchmarks
+# MolRGen: Molecular Generation and Docking Benchmarks
 
-Welcome to MolGenDocking, a comprehensive framework for molecular generation tasks with integrated protein-ligand docking evaluation. This project provides datasets, benchmarks, and a reward server for training and evaluating models that generate drug-like molecules optimized for specific biological targets.
+Welcome to MolRGen, a comprehensive framework for molecular generation tasks with integrated protein-ligand docking evaluation. This project provides datasets, benchmarks, and a reward server for training and evaluating models that generate drug-like molecules optimized for specific biological targets.
 
 
 
@@ -10,8 +10,8 @@ Welcome to MolGenDocking, a comprehensive framework for molecular generation tas
 
 **Basic Installation:**
 ```bash
-git clone https://github.com/Fransou/MolGenDocking.git
-cd MolGenDocking
+git clone https://github.com/Fransou/MolRGen.git
+cd MolRGen
 pip install -e .[main]
 ```
 *If called as `pip install .`, pytdc will not be installed.*
@@ -24,7 +24,7 @@ pip install -e .[main]
 export DOCKING_ORACLE=autodock_gpu
 ... # Set other environment variables as needed
 export DATA_PATH=... # Path to your data directory
-uvicorn --host 0.0.0.0 --port 8000 mol_gen_docking.server:app
+uvicorn --host 0.0.0.0 --port 8000 molrgen.server:app
 ```
 
 ### Using the API
@@ -57,7 +57,7 @@ The server also includes MCP (Model Context Protocol) support for seamless integ
 
 ## Citation
 
-If you use MolGenDocking in your research, please cite:
+If you use MolRGen in your research, please cite:
 
 ```bibtex
 ...
@@ -65,8 +65,8 @@ If you use MolGenDocking in your research, please cite:
 
 ## License
 
-Apache License 2.0. See [LICENSE](https://github.com/Fransou/MolGenDocking/LICENSE.md) for details.
+Apache License 2.0. See [LICENSE](https://github.com/Fransou/MolRGen/LICENSE.md) for details.
 
 ## Support
 
-For issues, questions, or contributions, please visit our [GitHub repository](https://github.com/Fransou/MolGenDocking).
+For issues, questions, or contributions, please visit our [GitHub repository](https://github.com/Fransou/MolRGen).

@@ -27,7 +27,7 @@ The Reaction Verifier supports various reaction-related tasks:
 
 
 
-::: mol_gen_docking.reward.verifiers.reaction_reward.reaction_verifier_pydantic_model
+::: molrgen.reward.verifiers.reaction_reward.reaction_verifier_pydantic_model
     handler: python
     heading_level: 3
     options:
@@ -36,7 +36,7 @@ The Reaction Verifier supports various reaction-related tasks:
             - ReactionVerifierConfigModel
 
 
-::: mol_gen_docking.reward.verifiers.reaction_reward.input_metadata
+::: molrgen.reward.verifiers.reaction_reward.input_metadata
     handler: python
     heading_level: 3
     options:
@@ -44,7 +44,7 @@ The Reaction Verifier supports various reaction-related tasks:
         members:
             - ReactionVerifierInputMetadataModel
 
-::: mol_gen_docking.reward.verifiers.reaction_reward.reaction_verifier_pydantic_model
+::: molrgen.reward.verifiers.reaction_reward.reaction_verifier_pydantic_model
     handler: python
     heading_level: 3
     options:
@@ -53,7 +53,7 @@ The Reaction Verifier supports various reaction-related tasks:
             - ReactionVerifierOutputModel
             - ReactionVerifierMetadataModel
 
-::: mol_gen_docking.reward.verifiers.reaction_reward.reaction_verifier
+::: molrgen.reward.verifiers.reaction_reward.reaction_verifier
     handler: python
     heading_level: 3
     options:

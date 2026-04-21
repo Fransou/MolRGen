@@ -34,12 +34,12 @@ After building conversation samples, the extractor can enrich prompts with **rew
 ### Basic SFT Extraction
 
 ```python
-from mol_gen_docking.evaluation.sft_extraction import (
+from molrgen.evaluation.sft_extraction import (
     SFTExtractionConfig,
     SFTExtractor,
     Completion,
 )
-from mol_gen_docking.data.pydantic_dataset import Sample, Conversation, Message
+from molrgen.data.pydantic_dataset import Sample, Conversation, Message
 
 # Define the extraction configuration
 config = SFTExtractionConfig(
@@ -169,7 +169,7 @@ print(extractor.metadata.n_tokens)
 
 ## Class & Function Reference
 
-::: mol_gen_docking.evaluation.sft_extraction
+::: molrgen.evaluation.sft_extraction
     options:
         show_root_toc_entry: false
         heading_level: 3

@@ -38,7 +38,7 @@ The verifier extracts SMILES from completions using:
 
 
 
-::: mol_gen_docking.reward.verifiers.generation_reward.generation_verifier_pydantic_model
+::: molrgen.reward.verifiers.generation_reward.generation_verifier_pydantic_model
     handler: python
     heading_level: 3
     options:
@@ -48,7 +48,7 @@ The verifier extracts SMILES from completions using:
             - DockingGPUConfigModel
             - PyscreenerConfigModel
 
-::: mol_gen_docking.reward.verifiers.generation_reward.input_metadata
+::: molrgen.reward.verifiers.generation_reward.input_metadata
     handler: python
     heading_level: 3
     options:
@@ -56,7 +56,7 @@ The verifier extracts SMILES from completions using:
         members:
             - GenerationVerifierInputMetadataModel
 
-::: mol_gen_docking.reward.verifiers.generation_reward.generation_verifier_pydantic_model
+::: molrgen.reward.verifiers.generation_reward.generation_verifier_pydantic_model
     handler: python
     heading_level: 3
     options:
@@ -65,7 +65,7 @@ The verifier extracts SMILES from completions using:
             - GenerationVerifierOutputModel
             - GenerationVerifierMetadataModel
 
-::: mol_gen_docking.reward.verifiers.generation_reward.generation_verifier_pydantic_model
+::: molrgen.reward.verifiers.generation_reward.generation_verifier_pydantic_model
     handler: python
     heading_level: 3
     options:
@@ -73,7 +73,7 @@ The verifier extracts SMILES from completions using:
         members:
             - GenerationVerifierConfigModel
 
-::: mol_gen_docking.reward.verifiers.generation_reward.generation_verifier
+::: molrgen.reward.verifiers.generation_reward.generation_verifier
     handler: python
     heading_level: 3
     options:

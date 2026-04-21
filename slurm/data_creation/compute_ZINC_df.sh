@@ -19,7 +19,7 @@ source $HOME/OpenRLHF/bin/activate
 ray start --head --num-cpus 64
 
 echo "Starting job on from $1 to $2"
-python mol_gen_docking/compute_properties_ZINC.py \
+python molrgen/compute_properties_ZINC.py \
   --batch-size 64 \
   --i-start $1 \
   --i-end $2

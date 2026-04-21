@@ -79,7 +79,7 @@ The Reward Server provides REST endpoints for molecular scoring and docking calc
 import requests
 
 # Initialize the server
-# uvicorn mol_gen_docking.server:app --reload
+# uvicorn molrgen.server:app --reload
 
 # Check liveness
 response = requests.get("http://localhost:8000/liveness")

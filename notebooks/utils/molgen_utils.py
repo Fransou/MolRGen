@@ -10,7 +10,7 @@ from rdkit.Chem import AllChem
 from scipy.spatial.distance import squareform
 from tqdm import tqdm
 
-from mol_gen_docking.evaluation.diversity_aware_top_k import div_aware_top_k_from_dist
+from molrgen.evaluation.diversity_aware_top_k import div_aware_top_k_from_dist
 
 from .utils import process_model_name
 

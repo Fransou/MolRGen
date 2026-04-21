@@ -4,7 +4,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from mol_gen_docking.data.prompt_generator import PromptGenerator
+from molrgen.data.prompt_generator import PromptGenerator
 
 # =============================================================================
 # Fixtures

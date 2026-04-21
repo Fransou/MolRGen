@@ -15,7 +15,7 @@ source $HOME/OpenRLHF/bin/activate
 
 wandb offline
 mkdir $SLURM_TMPDIR/reinvent_rpo_finetuned_model_$2_$3_$4_$5_$6_$7_$8_$9
-HF_HUB_OFFLINE=1 python -m mol_gen_docking.baselines.reinvent.rl_opt_rpo \
+HF_HUB_OFFLINE=1 python -m molrgen.baselines.reinvent.rl_opt_rpo \
   --output_dir $SLURM_TMPDIR/reinvent_rpo_finetuned_model_$2_$3_$4_$5_$6_$7_$8_$9 \
   --model_name $9 \
   --dataset $DATA_PATH/eval_data/eval_prompts.jsonl \

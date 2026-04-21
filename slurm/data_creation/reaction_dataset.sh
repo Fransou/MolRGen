@@ -22,7 +22,7 @@ ray start --head --dashboard-port=$DASHBOARD_PORT
 
 ssh -N -f -R ${DASHBOARD_PORT}:localhost:${DASHBOARD_PORT} $SLURM_JOB_USER@rorqual4
 
-python mol_gen_docking/dataset/scripts/reaction_task/generate_reaction_dataset.py \
+python molrgen/dataset/scripts/reaction_task/generate_reaction_dataset.py \
   -d data \
   -o data/synthesis/train_prompts_json_$SLURM_ARRAY_TASK_ID.jsonl \
   -n 50000 \

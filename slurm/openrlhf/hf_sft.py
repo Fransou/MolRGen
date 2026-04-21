@@ -24,7 +24,7 @@ from datasets import Dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import SFTConfig, SFTTrainer
 
-from mol_gen_docking.data.pydantic_dataset import read_jsonl
+from molrgen.data.pydantic_dataset import read_jsonl
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
