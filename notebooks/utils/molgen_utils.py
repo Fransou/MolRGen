@@ -59,7 +59,7 @@ def load_molgen_results(
                     reward = float(g["reward"])
                 model_name = str(f).split("/")[-1].split("eval")[0][:-1]
                 if "scored" in model_name:
-                    model_name = str(f).split("/")[-1].split("scored")[0][:-2]
+                    model_name = f.parent.name
                 generations.append(
                     {
                         "prompt_id": g["metadata"]["prompt_id"],

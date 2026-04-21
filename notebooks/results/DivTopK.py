@@ -57,22 +57,31 @@ def get_x_vals(x_vals_config: dict | None) -> list[float] | None:
     return result
 
 
-def load_data(config: dict) -> tuple[pd.DataFrame, list]:
+def load_data(
+    config: dict, save_file: str = "divtopk_data.csv"
+) -> tuple[pd.DataFrame, list]:
     """Load and filter data based on config."""
-    molstral_path = Path(config["paths"]["molstral_path"])
+    if os.path.exists(save_file):
+        print(f"Loading preprocessed data from {save_file}...")
+        df = pd.read_csv(save_file)
+        df["smiles"] = df["smiles"].fillna("")
+    else:
+        molstral_path = Path(config["paths"]["molstral_path"])
 
-    files = [
-        f
-        for d in molstral_path.iterdir()
-        for f in d.iterdir()
-        if "error" not in str(f) and str(f).endswith("_scored.jsonl")
-    ]
-    files = sorted(files)
-    print("Total files:", len(files))
-    df = load_molgen_results(files)
+        files = [
+            f
+            for d in molstral_path.iterdir()
+            for f in d.iterdir()
+            if "error" not in str(f) and str(f).endswith("_scored.jsonl")
+        ]
+        files = sorted(files)
+        print("Total files:", len(files))
+        df = load_molgen_results(files)
+        df.to_csv(save_file, index=False)
 
     # Apply subsample filters
     sub_sample_prompts: list = []
+    print(df.model.unique())
     if (
         config["data"]["subsample_models"] is not None
         and len(config["data"]["subsample_models"]) > 0
@@ -105,9 +114,11 @@ def plot_div_topk(
     fp_name: str,
     legend: bool = False,
     cols_vals: list[float] = [10, 30],
+    row_vals: list[float] = [1.5, 2, 4],
     x_vals: list[float] | None = None,
-    row: str = "n_rollout",
+    row: str = "n_rollout_per_k",
     rollouts: list[int] = [32, 64, 128],
+    rollouts_is_frac: bool = True,
     col: str = "k",
     x: str = "sim",
     column_name: str = "k",
@@ -123,7 +134,7 @@ def plot_div_topk(
 ) -> sns.FacetGrid:
     def draw(data: pd.DataFrame, **kwargs: Any) -> None:
         # Separate highlighted and non-highlighted models
-        highlighted_data = data[data["Model"].isin(HIGHLIGHT_MODELS)]
+
         kwargs.update(
             dict(
                 x=x,
@@ -138,7 +149,7 @@ def plot_div_topk(
             data,
             sizes=1,
             alpha=0.7,
-            linewidth=1.2,
+            linewidth=0.5,
             legend=False,
             **kwargs,
         )
@@ -156,27 +167,32 @@ def plot_div_topk(
         )
 
         # Draw highlighted models with enhanced styling (thicker lines, larger markers)
-        if len(highlighted_data) > 0:
-            sns.lineplot(
-                highlighted_data,
-                sizes=1,
-                alpha=1,
-                linewidth=1.6,
-                legend=False,
-                **kwargs,
-            )
-            sns.lineplot(
-                highlighted_data.iloc[2::3],
-                style="Model",
-                sizes=1,
-                alpha=1,
-                markers=MARKER_MODELS,
-                markersize=markersize["highlight"],
-                linewidth=0.0,
-                markeredgewidth=0.0,
-                legend=False,
-                **kwargs,
-            )
+        if len(HIGHLIGHT_MODELS) > 0:
+            for model in HIGHLIGHT_MODELS:
+                highlighted_data = data[data["Model"] == model]
+                sns.lineplot(
+                    highlighted_data,
+                    sizes=1,
+                    alpha=1,
+                    linewidth=1.6,
+                    legend=False,
+                    **kwargs,
+                )
+                sns.lineplot(
+                    highlighted_data.iloc[2::3],
+                    style="Model",
+                    sizes=1,
+                    alpha=1,
+                    markers=MARKER_MODELS,
+                    markersize=markersize["highlight"],
+                    linewidth=0.0,
+                    markeredgewidth=0.0,
+                    legend=False,
+                    **kwargs,
+                )
+
+    if row == "n_rollout_per_k":
+        rollouts = np.unique([int(k * roll) for k in cols_vals for roll in row_vals])
 
     div_clus_df = get_top_k_div_df(
         df[df.prompt_id.isin(sub_sample_prompts[:])],
@@ -184,6 +200,11 @@ def plot_div_topk(
         rollouts=rollouts,
         **kwargs,
     )
+
+    if row == "n_rollout_per_k":
+        div_clus_df["n_rollout_per_k"] = div_clus_df["n_rollout"] / div_clus_df["k"]
+        div_clus_df = div_clus_df[div_clus_df["n_rollout_per_k"].isin(row_vals)]
+
     if cols_vals is not None:
         div_clus_df = div_clus_df[div_clus_df[col].isin(cols_vals)]
     if x_vals is not None:
@@ -202,10 +223,11 @@ def plot_div_topk(
     g.set_axis_labels("", "")
     # set x axis log
     g.set(xscale="log")
-
-    g.set_titles(
-        row_template="$n_r$={row_name}", col_template=column_name + "={col_name}"
-    )
+    if row == "n_rollout_per_k":
+        row_temp = "$n_r/k$={row_name}"
+    else:
+        row_temp = "$n_r$={row_name}"
+    g.set_titles(row_template=row_temp, col_template=column_name + "={col_name}")
     g.fig.supxlabel(xlabel, y=0.0, x=xlabel_x)
     g.fig.supylabel("Diversity-Aware Top-k Score", x=ylabel_x)
 

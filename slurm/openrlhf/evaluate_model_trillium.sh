@@ -36,10 +36,10 @@ export XDG_CACHE_HOME=$SLURM_TMPDIR
 export HF_HOME=$SLURM_TMPDIR
 export FLASHINFER_CACHE_DIR=$SLURM_TMPDIR/flashinfer_cache
 export FLASHINFER_CUBIN_DIR=$SLURM_TMPDIR/flashinfer_cubin
-
+export FLASHINFER_WORKSPACE_BASE=$SLURM_TMPDIR/flashinfer/workspace
+export FLASHINFER_HOME=$SLURM_TMPDIR/flashinfer
 
 ray start --head --node-ip-address 0.0.0.0 --dashboard-port=$DASHBOARD_PORT
-ssh -N -f -R ${DASHBOARD_PORT}:localhost:${DASHBOARD_PORT} $SLURM_JOB_USER@rorqual4
 
 
 #export DEBUG_MODE=1
@@ -58,7 +58,7 @@ if [ "$DATASET" == "molgendata" ]; then
     python -m mol_gen_docking.score_completions \
       --iter $SLURM_ARRAY_TASK_ID \
       --input_file $CONFIG \
-      --batch_size 1024 \
+      --batch_size 256 \
       --mol-generation
 else
     python -m mol_gen_docking.score_completions \

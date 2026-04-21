@@ -14,6 +14,9 @@
 DATASET=$1
 CONFIG=$2
 
+export RAY_TMPDIR=$SLURM_TMPDIR/ray
+mkdir -p $RAY_TMPDIR
+
 WORKING_DIR=$HOME/MolGenDocking
 export DASHBOARD_PORT=$((8001 + SLURM_ARRAY_TASK_ID))
 export DATA_PATH=$SLURM_TMPDIR/$DATASET
@@ -21,12 +24,24 @@ export DATA_PATH=$SLURM_TMPDIR/$DATASET
 source $HOME/.bashrc
 source $HOME/OpenRLHF/bin/activate
 
+ray stop || true
+
 cp $SCRATCH/MolGenData/$DATASET.tar.gz $SLURM_TMPDIR
 cd $SLURM_TMPDIR
 tar -xzf $DATASET.tar.gz
 cd $WORKING_DIR
 
 cp data/properties.csv $SLURM_TMPDIR
+
+export TRITON_CACHE_DIR=$SLURM_TMPDIR
+export XDG_CONFIG_HOME=$SLURM_TMPDIR
+export XDG_CACHE_HOME=$SLURM_TMPDIR
+export HF_HOME=$SLURM_TMPDIR
+export FLASHINFER_CACHE_DIR=$SLURM_TMPDIR/flashinfer_cache
+export FLASHINFER_CUBIN_DIR=$SLURM_TMPDIR/flashinfer_cubin
+export FLASHINFER_WORKSPACE_BASE=$SLURM_TMPDIR/flashinfer/workspace
+export FLASHINFER_HOME=$SLURM_TMPDIR/flashinfer
+
 ray start --head --node-ip-address 0.0.0.0 --dashboard-port=$DASHBOARD_PORT
 ssh -N -f -R ${DASHBOARD_PORT}:localhost:${DASHBOARD_PORT} $SLURM_JOB_USER@rorqual4
 

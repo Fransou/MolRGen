@@ -4,7 +4,6 @@ import logging
 from typing import Any, Callable, Dict, List, Literal
 
 import ray
-from ray.util import ActorPool
 from tdc.oracles import Oracle
 
 from mol_gen_docking.utils.property_utils import (
@@ -42,7 +41,7 @@ class ScorerRegistery:
         self.property_name_mapping = property_name_mapping
         self.docking_target_list = docking_target_list
 
-        self._docking_gpu_pool: ActorPool[Any] | None = None
+        self._docking_gpu_pool: List[Any] | None = None
         self._preparator: Any | None = None
 
         self.logger = logging.getLogger(__name__ + "/" + self.__class__.__name__)
@@ -108,18 +107,17 @@ class ScorerRegistery:
                 },
                 docking_concurrency_per_gpu=docking_concurrency_per_gpu,
             )
-            actors = [
+            self._docking_gpu_pool = [
                 AutoDockGPUDocking.options(  # type: ignore
                     num_gpus=1 / docking_concurrency_per_gpu, name=f"docking_{i}"
                 ).remote(**init_kwargs)
                 for i in range(num_docking_gpu_actors)
             ]
-            self._docking_gpu_pool = ActorPool(actors)
             print(
-                f"Running {num_docking_gpu_actors} Docking Actors on {docking_num_gpu}."
+                f"Running {num_docking_gpu_actors} Docking Actors on {docking_num_gpu} GPUs."
             )
 
-            ready_checks = [a.ping.remote() for a in actors]
+            ready_checks = [a.ping.remote() for a in self._docking_gpu_pool]
             try:
                 ray.get(ready_checks, timeout=300)
             except ray.exceptions.GetTimeoutError:
@@ -167,6 +165,9 @@ class ScorerRegistery:
                 )
 
                 self.set_docking_gpu_module(**kwargs)
+                assert self._docking_gpu_pool is not None, (
+                    "Docking GPU Module not available."
+                )
                 eval_fn = DockingMoleculeGpuOracle(
                     path_to_data=path_to_data,
                     receptor_name=oracle_name,

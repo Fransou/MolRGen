@@ -22,6 +22,7 @@ cd $WORKING_DIR
 cp data/properties.csv $SLURM_TMPDIR
 export DATA_PATH=$SLURM_TMPDIR/$DATASET
 
+export RAY_TMPDIR=$SLURM_TMPDIR/ray
 ray start --head
 
 export docking_oracle=autodock_gpu
