@@ -1,4 +1,4 @@
-# MolRGen: Molecular Generation and Docking Benchmarks
+# MOLRGEN : A Training and Evaluation Setting for De Novo Molecular Generation with Reasonning Models
 
 Welcome to MolRGen, a comprehensive framework for molecular generation tasks with integrated protein-ligand docking evaluation. This project provides datasets, benchmarks, and a reward server for training and evaluating models that generate drug-like molecules optimized for specific biological targets.
 
