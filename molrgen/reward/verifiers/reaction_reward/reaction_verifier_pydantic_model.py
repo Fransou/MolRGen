@@ -61,18 +61,6 @@ class ReactionVerifierConfigModel(BaseModel):
         description="Optional name of the Ray placement group to schedule tasks on.",
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        arbitrary_types_allowed = True
-        json_schema_extra = {
-            "example": {
-                "reward": "property",
-                "reaction_matrix_path": "data/rxn_matrix.pkl",
-                "reaction_reward_type": "tanimoto",
-            }
-        }
-
     @model_validator(mode="after")
     def check_reaction_matrix_path(self) -> "ReactionVerifierConfigModel":
         """Validate that the reaction matrix path exists."""

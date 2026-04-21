@@ -28,18 +28,6 @@ class MolPropVerifierConfigModel(BaseModel):
         description="Optional name of the Ray placement group to schedule tasks on.",
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        arbitrary_types_allowed = True
-        validate_assignment = True
-        json_schema_extra = {
-            "example": {
-                "reward": "property",
-                "parsing_method": "answer_tags",
-            }
-        }
-
 
 class MolPropVerifierMetadataModel(BaseModel):
     """Metadata model for molecular property verifier results.

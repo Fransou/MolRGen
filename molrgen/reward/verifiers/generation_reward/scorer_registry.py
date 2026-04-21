@@ -6,6 +6,21 @@ from typing import Any, Callable, Dict, List, Literal
 import ray
 from tdc.oracles import Oracle
 
+from molrgen.reward.verifiers.generation_reward.oracles.docking_utils.docking_soft import (
+    AutoDockGPUDocking,
+)
+from molrgen.reward.verifiers.generation_reward.oracles.docking_utils.preparators import (
+    MeekoLigandPreparator,
+)
+from molrgen.reward.verifiers.generation_reward.oracles.gpu_docking_oracle import (
+    DockingMoleculeGpuOracle,
+)
+from molrgen.reward.verifiers.generation_reward.oracles.pyscreener_oracle import (
+    PyscreenerOracle,
+)
+from molrgen.reward.verifiers.generation_reward.oracles.rdkit_oracle import (
+    RDKITOracle,
+)
 from molrgen.utils.property_utils import (
     rescale_property_values,
 )
@@ -14,7 +29,11 @@ from molrgen.utils.property_utils import (
 logger = logging.getLogger(__name__)
 
 
-@ray.remote(concurrency_groups={"serial_init": 1})  # type: ignore
+@ray.remote(
+    max_restarts=0,
+    concurrency_groups={"serial_init": 1},
+    runtime_env={"env_vars": {"RAY_WORKER_DEBUG": "1"}},
+)  # type: ignore
 class ScorerRegistery:
     """
     Class to register oracles returning the rescaled property of molecules
@@ -77,13 +96,6 @@ class ScorerRegistery:
             The initialized docking GPU module actor.
         """
         if self._docking_gpu_pool is None:
-            from molrgen.reward.verifiers.generation_reward.oracles.docking_utils.docking_soft import (
-                AutoDockGPUDocking,
-            )
-            from molrgen.reward.verifiers.generation_reward.oracles.docking_utils.preparators import (
-                MeekoLigandPreparator,
-            )
-
             num_docking_gpu_actors = int(docking_num_gpu * docking_concurrency_per_gpu)
             if preparator_class is None:
                 preparator_class = MeekoLigandPreparator
@@ -151,19 +163,11 @@ class ScorerRegistery:
         eval_fn: Callable[[Any], Any]
         if oracle_name in self.docking_target_list:
             if docking_oracle == "pyscreener":
-                from molrgen.reward.verifiers.generation_reward.oracles.pyscreener_oracle import (
-                    PyscreenerOracle,
-                )
-
                 eval_fn = PyscreenerOracle(
                     oracle_name, path_to_data=path_to_data, **kwargs
                 )
 
             elif docking_oracle == "autodock_gpu":
-                from molrgen.reward.verifiers.generation_reward.oracles.gpu_docking_oracle import (
-                    DockingMoleculeGpuOracle,
-                )
-
                 self.set_docking_gpu_module(**kwargs)
                 assert self._docking_gpu_pool is not None, (
                     "Docking GPU Module not available."
@@ -183,10 +187,6 @@ class ScorerRegistery:
         ]:
             eval_fn = Oracle(name=oracle_name, **kwargs)
         else:
-            from molrgen.reward.verifiers.generation_reward.oracles.rdkit_oracle import (
-                RDKITOracle,
-            )
-
             eval_fn = RDKITOracle(oracle_name)
 
         self._evaluator_registry[oracle_name] = eval_fn

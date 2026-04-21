@@ -214,32 +214,6 @@ class GenerationVerifierConfigModel(BaseModel):
         description="Optional name of the Ray placement group to schedule tasks on.",
     )
 
-    class Config:
-        """Pydantic configuration for GenerationVerifierConfigModel.
-
-        Attributes:
-            arbitrary_types_allowed: Allows arbitrary types (like Ray objects) in the model.
-            json_schema_extra: Provides a JSON schema example for the model configuration,
-                             demonstrating typical values for all fields.
-        """
-
-        arbitrary_types_allowed = True
-        json_schema_extra = {
-            "example": {
-                "path_to_mappings": "data/molgendata",
-                "reward": "property",
-                "rescale": True,
-                "oracle_kwargs": {
-                    "exhaustiveness": 8,
-                    "n_cpu": 8,
-                    "docking_oracle": "autodock_gpu",
-                    "docking_executable": "autodock_gpu_256wi",
-                    "docking_num_gpu": 1,
-                    "docking_concurrency_per_gpu": 8,
-                },
-            }
-        }
-
     @model_validator(mode="after")
     def check_mappings_path(self) -> "GenerationVerifierConfigModel":
         """Validate that the path_to_mappings exists and contains required files.

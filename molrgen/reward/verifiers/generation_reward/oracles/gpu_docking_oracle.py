@@ -9,7 +9,7 @@ from ray.actor import ActorProxy
 from tdc.metadata import docking_target_info
 from tdc.utils import receptor_load
 
-from mol_gen_docking.reward.verifiers.generation_reward.oracles.docking_utils.docking_soft import (
+from molrgen.reward.verifiers.generation_reward.oracles.docking_utils.docking_soft import (
     BaseDocking,
     DockingOutput,
 )
