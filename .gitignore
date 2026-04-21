@@ -202,4 +202,4 @@ oracle
 *.idea
 *.sqsh
 
-/MolGenDocking-latex
+MolGenDocking-latex
