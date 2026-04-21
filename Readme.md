@@ -1,18 +1,19 @@
-[![Tests-PIP](https://github.com/Fransou/MolGenDocking/actions/workflows/test_pip_installation.yml/badge.svg)](https://github.com/Fransou/MolGenDocking/actions/workflows/test_pip_installation.yml)
-[![Tests-DOCKER](https://github.com/Fransou/MolGenDocking/actions/workflows/test_docker_image.yml/badge.svg)](https://github.com/Fransou/MolGenDocking/actions/workflows/test_docker_image.yml)
-[![Documentation](https://github.com/Fransou/MolGenDocking/actions/workflows/docs.yml/badge.svg)](https://fransou.github.io/MolGenDocking/)
+[![Tests-PIP](https://github.com/Fransou/MolRGen/actions/workflows/test_pip_installation.yml/badge.svg)](https://github.com/Fransou/MolRGen/actions/workflows/test_pip_installation.yml)
+[![Tests-DOCKER](https://github.com/Fransou/MolRGen/actions/workflows/test_docker_image.yml/badge.svg)](https://github.com/Fransou/MolRGen/actions/workflows/test_docker_image.yml)
+[![Documentation](https://github.com/Fransou/MolRGen/actions/workflows/docs.yml/badge.svg)](https://fransou.github.io/MolRGen/)
 
-# MolGenDocking: Molecular Generation and Docking Benchmarks
+# MolRGen: Molecular Generation and Docking Benchmarks
 
 A comprehensive framework for molecular generation tasks with integrated protein-ligand docking evaluation. This project provides datasets, benchmarks, and a reward server for training and evaluating models that generate drug-like molecules optimized for specific biological targets.
 
-📚 **[Full Documentation](https://fransou.github.io/MolGenDocking/)**
+📚 **[Full Documentation](https://fransou.github.io/MolRGen/)**
+📚 **[HuggingFace Dataset](https://huggingface.co/datasets/Franso/MolRGen)
 
 ## :nut_and_bolt: Installation
 
 ```bash
-git clone https://github.com/Fransou/MolGenDocking.git
-cd MolGenDocking
+git clone https://github.com/Fransou/MolRGen.git
+cd MolRGen
 pip install -e .[main]
 ```
 
@@ -55,9 +56,9 @@ response = requests.post(
 
 | Section | Description |
 |---------|-------------|
-| [Datasets](https://fransou.github.io/MolGenDocking/datasets/main/) | De novo generation, property prediction, and retro-synthesis datasets |
-| [Reward Server](https://fransou.github.io/MolGenDocking/reward_server/getting_started/) | Server configuration, endpoints, and query format |
-| [API Reference](https://fransou.github.io/MolGenDocking/api/toc/) | Detailed API documentation for all modules |
+| [Datasets](https://fransou.github.io/MolRGen/datasets/main/) | De novo generation, property prediction, and retro-synthesis datasets |
+| [Reward Server](https://fransou.github.io/MolRGen/reward_server/getting_started/) | Server configuration, endpoints, and query format |
+| [API Reference](https://fransou.github.io/MolRGen/api/toc/) | Detailed API documentation for all modules |
 
 ## :microscope: Supported Tasks
 
@@ -68,17 +69,9 @@ response = requests.post(
 ## Citation
 
 ```bibtex
-@article{molgenDocking2025,
-  title={MolGenDocking: A Benchmark for Molecular Generation with Docking Evaluation},
-  author={...},
-  year={2025}
-}
+Ongoing work
 ```
 
 ## License
 
 [Apache 2.0 License](LICENSE)
-
-## Support
-
-For issues, questions, or contributions, please visit our [GitHub repository](https://github.com/Fransou/MolGenDocking).
