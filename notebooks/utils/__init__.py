@@ -10,7 +10,7 @@ from .molprop_utils import load_molprop_results
 from .pandas_to_latex import PandasTableFormatter
 from .synthesis_utils import load_synth_results
 
-N_COLORS = 16
+N_COLORS = 13
 palette = sns.husl_palette(
     n_colors=N_COLORS,
     s=0.95,  # Saturation
@@ -19,37 +19,37 @@ palette = sns.husl_palette(
 CMAP_MODELS = {
     # Chem models — muted reds
     "ChemDFM-R": palette[0],
-    "ChemDFM-v2.0": palette[1],
-    "ether0": palette[2],
-    "RL-Mistral": palette[3],
-    "RL-Molstral": palette[4],
+    "ChemDFM-v2.0": palette[0],
+    "ether0": palette[1],
+    "RL-Mistral": palette[2],
+    "RL-Molstral": palette[2],
 }
 
 CMAP_MODELS.update(
     {
         # Reasoning models — cool blues / teals
-        "MiniMax-M2": palette[6],
-        "Qwen3": palette[7],
-        "Qwen3-Next": palette[8],
-        "gpt-oss": palette[9],
-        "R1-Llama": palette[10],
-        "R1-Qwen": palette[11],
+        "MiniMax-M2": palette[5],
+        "Qwen3": palette[6],
+        "Qwen3-Next": palette[6],
+        "gpt-oss": palette[7],
+        "R1-Llama": palette[8],
+        "R1-Qwen": palette[8],
+        "Mistral-Small-4": palette[9],
     }
 )
 
 CMAP_MODELS.update(
     {
         # Non-reasoning models — warm greens / golds
-        "Llama-3.3": palette[13],
-        "gemma-3": palette[14],
-        "gemma-4": palette[15],
+        "Llama-3.3": palette[11],
+        "gemma-3": palette[12],
+        "gemma-4": palette[12],
     }
 )
 MARKER_MODELS = {
     # Chemistry-specialized models
     "RL-Mistral": "X",
-    "RL-Mistral-100": "X",
-    "RL-Molstral": "X",
+    "RL-Molstral": "p",
     "ChemDFM-R": "^",
     "ChemDFM-v2.0": "o",
     "ether0": "v",
@@ -60,6 +60,7 @@ MARKER_MODELS = {
     "gpt-oss": "D",
     "R1-Llama": "P",
     "R1-Qwen": "X",
+    "Mistral-Small-4": "^",
     # Non-reasoning general models
     "Llama-3.3": "p",
     "gemma-3": "*",
