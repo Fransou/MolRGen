@@ -21,10 +21,12 @@ plot:
   fp_name: "ecfp6-2048"
   cols_vals:
     - 4
-    - 8
     - 16
   x_vals: null
   row: "n_rollout_per_k"
+  row_vals:
+    - 2
+    - 4
   col: "k"
   x: "sim"
   column_name: "k"
@@ -32,13 +34,13 @@ plot:
   xlabel_x: 0.5
   ylabel_x: 0.05
   legend: true
-  legend_bbox: [1.02, 0.25]
-  legend_ncols: 1
-  height: 1.9
-  aspect: 1.4
+  legend_bbox: [0.5, -0.16]
+  legend_ncols: 6
+  height: 2.2
+  aspect: 1.9
   markersize:
-    normal: 4.3
-    highlight: 5
+    normal: 6
+    highlight: 7
 
 sim_values:
   type: "logspace"

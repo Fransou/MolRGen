@@ -7,10 +7,15 @@ paths:
 
 data:
   subsample_models:
-    - "MiniMax-M2_"
-    - "Qwen3-Next-80B-A3B-Thinking_"
-    - "RL-Mistral-24B_"
-    - "RL-Molstral_"
+    - "MiniMax-M2"
+    - "Qwen3-Next-80B-A3B-Thinking"
+    - "RL-Mistral-24B"
+    - "RL-Molstral"
+    - "gemma-4-31B-it"
+  remove_model:
+    - "gpt-oss"
+    - "R1-Llama"
+    - "R1-Qwen"
 
 plot:
   fingerprints:
@@ -26,6 +31,9 @@ plot:
     - 16
   x_vals: null
   row: "n_rollout_per_k"
+  row_vals:
+    - 2
+    - 4
   col: "k"
   x: "sim"
   column_name: "k"
@@ -40,11 +48,11 @@ plot:
   aspect: 1.6
   suptitle_y: 0.95
   markersize:
-    normal: 3.5
-    highlight: 3.9
+    normal: 6
+    highlight: 7
 
 sim_values:
   type: "logspace"
   start: -1.2
-  stop: -0.01
-  num: 18
+  stop: -0.001
+  num: 15
