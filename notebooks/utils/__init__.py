@@ -63,7 +63,7 @@ MARKER_MODELS = {
 }
 
 # Models to highlight in plots
-HIGHLIGHT_MODELS = ["ChemDFM-R", "gemma-4", "RL-Molstral"]
+HIGHLIGHT_MODELS = ["ChemDFM-R", "gemma-4", "RL-Molstral", "Mistral-Small-4"]
 
 # =============================================================================
 # Public API
