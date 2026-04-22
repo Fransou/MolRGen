@@ -24,7 +24,7 @@ plot:
     - "maccs"
 #    - "rdkit"
 #    - "Avalon"
-#    - "Gobbi2d"
+    - "Gobbi2d"
   legend_fingerprint: "Avalon"  # Only this fingerprint gets a legend
   cols_vals:
     - 4

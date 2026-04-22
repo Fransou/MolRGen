@@ -143,7 +143,7 @@ def agg_topk(
 ) -> Callable[[pd.DataFrame], float]:
     def w_fn(sub_df: pd.DataFrame) -> float:
         # print(len(x))
-        sub_df = sub_df[:n_rollout]
+        sub_df = sub_df.sample(n_rollout)
         sub_df = sub_df.sort_values(by=by, ascending=False)
         sub_df = sub_df.drop_duplicates(subset=by_dupl)
         # Pad with 0s
