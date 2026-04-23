@@ -19,6 +19,9 @@ class PandasTableFormatter:
         already_rotated: bool = False,
         global_agg: bool = True,
         color_mapping: Union[Callable[[float], str], None] = None,
+        groupby_col: str | None = None,
+        color_mapping_key_idx: int | None = None,
+        merge_aggs: bool = False,
     ):
         """
         PandasTableFormatter is a class that formats a Pandas DataFrame into a LaTeX
@@ -32,6 +35,11 @@ class PandasTableFormatter:
 
         :param color_mapping: Optional callable that takes a float value and returns a color string (e.g., '#FF5733').
                             This function will be applied to each cell to assign background colors based on values.
+        :param color_mapping_key_idx: Optional index specifying which aggregation method's value should be used
+                            to determine the color for all related cells (e.g., use mean's value to color both mean and std).
+                            If None, color_mapping is applied to each cell independently.
+        :param merge_aggs: If True, merges all aggregated values into a single cell (e.g., "1.5±0.5" instead of separate columns).
+                          The formatting is determined by special_format_agg for non-main aggregations.
         """
         self.n_decimals = n_decimals
         self.aggregation_methods = aggregation_methods
@@ -39,6 +47,9 @@ class PandasTableFormatter:
         self.already_rotated = already_rotated
         self.global_agg = global_agg
         self.color_mapping = color_mapping
+        self.groupby_col = groupby_col
+        self.color_mapping_key_idx = color_mapping_key_idx
+        self.merge_aggs = merge_aggs
 
         for agg in self.aggregation_methods:
             if not isinstance(agg, str) and not callable(agg):
@@ -53,6 +64,11 @@ class PandasTableFormatter:
         assert 0 <= main_subset < len(aggregation_methods), (
             "main_subset must be an integer between 0 and the number of aggregation methods"
         )
+
+        if color_mapping_key_idx is not None:
+            assert 0 <= color_mapping_key_idx < len(aggregation_methods), (
+                "color_mapping_key_idx must be an integer between 0 and the number of aggregation methods"
+            )
 
         self.main_subset = main_subset
         if isinstance(aggregation_methods[main_subset], str):
@@ -84,7 +100,44 @@ class PandasTableFormatter:
             ps_list.append(np.where(s == fn(s[~previous_ps]), True, False))
         return [props if p else "" for p in ps_list[-1]]
 
-    def _apply_color_mapping(self, s: np.ndarray | pd.Series) -> List[str]:
+    def _find_k_th_fn_for_merge(
+        self,
+        df: pd.DataFrame,
+        fn: Callable[[np.ndarray | pd.Series], float],
+        k: int,
+        props: str = "",
+        main_agg: str = "mean",
+    ) -> List[tuple]:
+        """
+        Find top k values for highlighting and return their indices and columns.
+        Used for merge_aggs to preserve highlighting after merging.
+
+        :param df: The aggregated dataframe.
+        :param fn: The highlight function (e.g., np.nanmax).
+        :param k: The number of top values to highlight.
+        :param props: The CSS properties to apply.
+        :param main_agg: The main aggregation method name.
+        :return: List of (row_index, column) tuples that should be highlighted.
+        """
+        highlighted = []
+
+        # Get columns that match the main aggregation
+        main_agg_cols = [c for c in df.columns if c[-1] == main_agg]
+
+        for col in main_agg_cols:
+            s = df[col]
+            ps_list = [np.where(s == fn(s), True, False)]
+            for i in range(1, k):
+                previous_ps = np.concatenate(ps_list).reshape(i, -1).any(axis=0)
+                ps_list.append(np.where(s == fn(s[~previous_ps]), True, False))
+
+            # Get indices where this column should be highlighted
+            mask = ps_list[-1]
+            for row_idx in df.index:
+                if mask[df.index.get_loc(row_idx)]:
+                    highlighted.append((row_idx, col))
+
+        return highlighted
         """
         Apply color mapping to a series of values based on the color_mapping function.
 
@@ -105,6 +158,128 @@ class PandasTableFormatter:
                 except (ValueError, TypeError):
                     colors.append("")
         return colors
+
+    def _apply_color_mapping_with_key(
+        self, df: pd.DataFrame, color_mapping_key_idx: int
+    ) -> pd.DataFrame:
+        """
+        Apply color mapping based on a specific aggregation method's value to all related cells.
+        Groups cells by their base column (all levels except the last 'agg' level) and applies
+        color based on the value from the specified aggregation index.
+
+        :param df: The aggregated dataframe with MultiIndex columns.
+        :param color_mapping_key_idx: Index of the aggregation method to use for color determination.
+        :return: A dataframe of CSS background-color properties.
+        """
+        if self.color_mapping is None:
+            return pd.DataFrame("", index=df.index, columns=df.columns)
+
+        # Get the aggregation method name at the specified index
+        agg_method = self.aggregation_methods[color_mapping_key_idx]
+        key_agg_name = (
+            agg_method if isinstance(agg_method, str) else agg_method.__name__
+        )
+
+        # Create output dataframe with same shape
+        colors_df = pd.DataFrame("", index=df.index, columns=df.columns)
+
+        # Group columns by their base (all levels except the last 'agg' level)
+        grouped_cols: dict[str, list] = {}
+        for col in df.columns:
+            base_col = col[:-1]  # All levels except the last (agg) level
+            if base_col not in grouped_cols:
+                grouped_cols[base_col] = []
+            grouped_cols[base_col].append(col)
+
+        # For each group, get the color from the key aggregation method and apply to all
+        for base_col, cols_in_group in grouped_cols.items():
+            # Find the column with the key aggregation method
+            key_col = None
+            for col in cols_in_group:
+                if col[-1] == key_agg_name:
+                    key_col = col
+                    break
+
+            if key_col is not None:
+                # Apply color mapping based on key column values to all columns in the group
+                for row_idx in df.index:
+                    val = df.loc[row_idx, key_col]
+                    if pd.isna(val):
+                        color = ""
+                    else:
+                        try:
+                            color = self.color_mapping(float(val))
+                            color = f"background-color: {color};"
+                        except (ValueError, TypeError):
+                            color = ""
+
+                    # Apply this color to all cells in the group for this row
+                    for col in cols_in_group:
+                        colors_df.loc[row_idx, col] = color
+
+        return colors_df
+
+    def _merge_aggregations(
+        self,
+        df_agg: pd.DataFrame,
+        special_format_agg: Dict[str, Callable[[str], str]],
+    ) -> pd.DataFrame:
+        """
+        Merge all aggregation methods for each base column into a single concatenated value.
+
+        :param df_agg: The aggregated dataframe with MultiIndex columns ([col_levels..., agg]).
+        :param special_format_agg: Dictionary mapping aggregation names to formatting functions.
+        :return: A dataframe with merged aggregations (agg level removed from MultiIndex).
+        """
+        # Create a new dataframe with merged columns
+        merged_data = {}
+
+        # Group columns by their base (all levels except the last 'agg' level)
+        grouped_cols: dict[str, list] = {}
+        for col in df_agg.columns:
+            base_col = col[:-1]  # All levels except the last (agg) level
+            if base_col not in grouped_cols:
+                grouped_cols[base_col] = []
+            grouped_cols[base_col].append(col)
+
+        # For each base column, merge all aggregations
+        for base_col, cols_in_group in grouped_cols.items():
+            merged_col_values = []
+
+            for row_idx in df_agg.index:
+                merged_values = []
+
+                for col in cols_in_group:
+                    val = df_agg.loc[row_idx, col]
+                    agg_name = col[-1]
+
+                    if pd.isna(val):
+                        val_str = "NaN"
+                    else:
+                        val_str = str(np.round(val, self.n_decimals))
+
+                    # Apply special formatting if available
+                    if agg_name in special_format_agg:
+                        val_str = special_format_agg[agg_name](val_str)
+
+                    merged_values.append(val_str)
+
+                # Concatenate all values for this row
+                merged_col_values.append(" ".join(merged_values))
+
+            # Add the merged column to the output
+            merged_data[base_col] = merged_col_values
+
+        # Create the new dataframe with merged columns
+        merged_df = pd.DataFrame(merged_data, index=df_agg.index)
+
+        # Convert column names from tuples to regular index
+        merged_df.columns = pd.Index(
+            [col for col in merged_df.columns],
+            name=None,
+        )
+
+        return merged_df
 
     def _aggregate_results_and_pivot(
         self,
@@ -162,9 +337,17 @@ class PandasTableFormatter:
         dataframes_to_concatenate = []
         df_glob = []
         for i_agg_meth, agg in enumerate(self.aggregation_methods):
+            if isinstance(rows, str):
+                rows = [rows]
+            if self.groupby_col is not None:
+                rows_p = rows + [self.groupby_col]
+            else:
+                rows_p = rows
             df_agg = df_base.pivot_table(
-                index=rows, columns=cols, values=values, aggfunc=agg
+                index=rows_p, columns=cols, values=values, aggfunc=agg
             )
+            if self.groupby_col is not None:
+                df_agg = df_agg.groupby(rows).mean()
             df_agg.columns = pd.MultiIndex.from_arrays(
                 [df_agg.columns.get_level_values(i) for i in range(len(cols))]
                 + [
@@ -295,6 +478,66 @@ class PandasTableFormatter:
             values=values,
         )
 
+        # Apply highlighting to the original df_agg before merging
+        highlight_styles = None
+        if not self.merge_aggs:
+            # Highlighting will be applied later in the normal flow
+            pass
+        else:
+            # For merge_aggs, we need to capture highlighting info before merging
+            # Apply highlighting to find which cells should be highlighted
+            highlighted_cells: dict[
+                Any, dict[str, str]
+            ] = {}  # row_idx -> {base_col: props}
+            for i in range(1, len(props) + 1):
+                highlight_result = self._find_k_th_fn_for_merge(
+                    df_agg,
+                    fn=highlight_fn,
+                    k=i,
+                    props=props[i - 1],
+                    main_agg=self.main_agg,
+                )
+                for idx, col in highlight_result:
+                    if idx not in highlighted_cells:
+                        highlighted_cells[idx] = {}
+                    base_col = col[:-1]
+                    highlighted_cells[idx][base_col] = props[i - 1]
+            highlight_styles = highlighted_cells
+
+        # Compute colors before merging (if color mapping is requested)
+        colors_df_before_merge = None
+        if self.color_mapping is not None and self.color_mapping_key_idx is not None:
+            colors_df_before_merge = self._apply_color_mapping_with_key(
+                df_agg, self.color_mapping_key_idx
+            )
+
+        # Merge aggregations if requested
+        if self.merge_aggs:
+            df_agg = self._merge_aggregations(df_agg, special_format_agg)
+            # When merging, we no longer need special formatting as it's applied during merge
+            formatter = {}
+
+            # Convert colors_df to match the merged structure
+            if colors_df_before_merge is not None:
+                # Group columns by their base and merge colors
+                merged_colors = {}
+                grouped_cols: dict[Any, list[str]] = {}
+
+                for col in colors_df_before_merge.columns:
+                    base_col = col[:-1] if isinstance(col, tuple) else col
+                    if base_col not in grouped_cols:
+                        grouped_cols[base_col] = []
+                    grouped_cols[base_col].append(col)
+
+                for base_col, cols_in_group in grouped_cols.items():
+                    # Use the color from the main_agg column if available
+                    if len(cols_in_group) > 0:
+                        merged_colors[base_col] = colors_df_before_merge[
+                            cols_in_group[0]
+                        ]
+
+                colors_df_before_merge = pd.DataFrame(merged_colors, index=df_agg.index)
+
         # Trick as there is a data leakage (pandas issue)
         def wrap_special_format_agg(fn: Callable[[str], str]) -> Callable[[float], str]:
             def wrapped(x: float) -> str:
@@ -304,11 +547,12 @@ class PandasTableFormatter:
 
             return wrapped
 
-        formatter = {
-            c: wrap_special_format_agg(special_format_agg[c[-1]])
-            for c in df_agg.columns
-            if c[-1] in special_format_agg
-        }
+        if not self.merge_aggs:
+            formatter = {
+                c: wrap_special_format_agg(special_format_agg[c[-1]])
+                for c in df_agg.columns
+                if c[-1] in special_format_agg
+            }
         if remove_col_names and len(df_agg.columns.names) > 0:
             df_agg.columns = df_agg.columns.set_names(
                 [
@@ -323,18 +567,41 @@ class PandasTableFormatter:
             formatter,
             precision=self.n_decimals,
         )
-        # Apply the highlight function to the specified columns
-        for i in range(1, k + 1):
-            style.apply(
-                partial(self._find_k_th_fn, fn=highlight_fn, k=i, props=props[i - 1]),
-                subset=([c for c in df_agg.columns if c[-1] == self.main_agg]),
-            )
+
+        # Apply the highlight function to the specified columns (only if not merged)
+        if not self.merge_aggs:
+            for i in range(1, k + 1):
+                style.apply(
+                    partial(
+                        self._find_k_th_fn, fn=highlight_fn, k=i, props=props[i - 1]
+                    ),
+                    subset=([c for c in df_agg.columns if c[-1] == self.main_agg]),
+                )
+        else:
+            # For merged aggs, apply highlighting based on pre-computed highlight_styles
+            if highlight_styles:
+
+                def apply_highlight_to_merged(x: pd.Series) -> pd.Series:
+                    result = [""] * len(x)
+                    row_idx = x.name
+                    if row_idx in highlight_styles:
+                        for col_idx, col in enumerate(x.index):
+                            if col in highlight_styles[row_idx]:
+                                result[col_idx] = highlight_styles[row_idx][col]
+                    return result
+
+                style.apply(apply_highlight_to_merged, axis=1)
 
         # Apply color mapping to all cells if color_mapping is provided
-        if self.color_mapping is not None:
-            style.apply(self._apply_color_mapping)
+        if colors_df_before_merge is not None:
+            if self.merge_aggs:
+                # For merged aggs, apply colors directly from merged colors df
+                style.apply(lambda x: colors_df_before_merge.loc[x.name].values, axis=1)
+            else:
+                # For non-merged, use the original logic
+                style.apply(lambda x: colors_df_before_merge.loc[x.name].values, axis=1)
 
-        if self.hide_agg_labels:
+        if self.hide_agg_labels and not self.merge_aggs:
             style = style.hide(axis="columns", level=df_agg.columns.nlevels - 1)
         return style
 
@@ -343,6 +610,7 @@ class PandasTableFormatter:
         style: Styler,
         cols_sep: Union[str, int, None] = 0,
         n_first_cols: int | None = None,
+        column_format: str | None = None,
         **kwargs: Dict[str, Any],
     ) -> str:
         """
@@ -386,13 +654,12 @@ class PandasTableFormatter:
         )
         return latex
 
-    def save_to_latex(
+    def latex(
         self,
         style: Styler,
-        filename: str = "table.tex",
         cols_sep: Union[str, int, None] = 0,
         **kwargs: Any,
-    ) -> None:
+    ) -> str:
         """
         Saves the styled dataframe to a LaTeX file.
 
@@ -400,5 +667,4 @@ class PandasTableFormatter:
         :param filename: The name of the LaTeX file.
         """
         latex = self.get_latex(style, cols_sep, **kwargs)
-        with open(filename, "w") as f:
-            f.write(latex)
+        return latex
