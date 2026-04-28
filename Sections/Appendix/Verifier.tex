@@ -1,0 +1,243 @@
+\section{Molecular Verifier}
+\label{app:verifier}
+
+The Molecular Verifier is a distributed reward computation system that
+evaluates language model completions across three classes of cheminformatics
+tasks: de~novo molecular generation, molecular property prediction, and
+retrosynthetic planning.  It is deployed as an asynchronous HTTP service built
+on FastAPI~\citep{fastapi} with Ray~\citep{ray} providing the distributed
+execution backend.  This appendix describes its internal architecture,
+task-routing logic, and the reward functions used for each task class.
+
+%----------------------------------------------------------------------
+\subsection{System Architecture}
+\label{app:verifier:architecture}
+
+\paragraph{Ray actors.}
+At startup, a \textsc{MolecularVerifier} object is instantiated as a Ray
+remote actor.  Ray enables the verifier to run concurrently with the language
+model inference process on separate CPU and GPU resources, and to manage
+independent worker pools for computationally intensive operations such as
+molecular docking.
+
+\paragraph{Asynchronous request buffering.}
+Reward queries arrive concurrently from many rollout workers.  Rather than
+evaluating each query independently—which would prevent GPU utilisation from
+reaching an efficient level—a \textsc{RewardBuffer} component accumulates
+incoming requests for a configurable window $\Delta t$ (default
+\SI{20}{\second}).  After this window has elapsed, all pending queries are
+merged into a single batch and forwarded to the Ray actor.  This batching
+strategy amortises the fixed overhead of GPU kernel launches and reduces
+context-switching costs.  Formally, let $\{q_1, \ldots, q_N\}$ be the set of
+queries arriving within $[t, t+\Delta t]$.  Their completions
+$c_1,\ldots,c_N$ and associated metadata
+$m_1,\ldots,m_N$ are concatenated into a joint batch, scored in a single
+forward pass, and then redistributed to the individual futures awaiting each
+$q_i$.
+
+%----------------------------------------------------------------------
+\subsection{Task Routing}
+\label{app:verifier:routing}
+
+Each query is accompanied by a structured metadata object specifying the list
+of molecular properties to evaluate, the optimisation objectives, and
+numerical target values (when applicable).  The \textsc{MolecularVerifier}
+inspects each metadata record and routes the corresponding completion to one
+of three sub-verifiers:
+
+\begin{enumerate}
+  \item \textbf{GenerationVerifier} — activated when the metadata contains
+        property names drawn from the set of supported molecular descriptors
+        or docking targets.
+  \item \textbf{MolPropVerifier} — activated when the metadata specifies a
+        regression or classification objective over a single molecular
+        property, requiring the model to predict a numerical value rather than
+        generate a novel molecule.
+  \item \textbf{ReactionVerifier} — activated when the metadata describes a
+        retrosynthetic or forward-reaction task, requiring the model to
+        propose a sequence of reaction steps.
+\end{enumerate}
+
+Batches may contain queries belonging to different task types; in this case
+the three sub-verifiers are called in parallel and their results are
+reassembled in the original query order before being returned.
+
+%----------------------------------------------------------------------
+\subsection{Answer Parsing}
+\label{app:verifier:parsing}
+
+Before any verification logic is applied, the raw model completion is parsed
+to isolate the structured answer region.  Three parsing modes are supported:
+
+\begin{itemize}
+  \item \textit{answer\_tags}: Content enclosed in
+        \texttt{<answer>}\ldots\texttt{</answer>} delimiters is extracted.
+        If the extracted span itself contains a
+        \texttt{\textbackslash boxed\{\ldots\}} expression, the boxed content
+        is further extracted.
+  \item \textit{boxed}: The innermost \texttt{\textbackslash boxed\{\ldots\}}
+        expression in the raw completion is extracted directly.
+  \item \textit{none}: The full completion is used as-is after removing
+        special tokens.
+\end{itemize}
+
+The same parsing mechanism is shared by all three sub-verifiers, ensuring
+consistent answer extraction regardless of task type.
+
+%----------------------------------------------------------------------
+\subsection{Generation Verifier}
+\label{app:verifier:generation}
+
+\paragraph{SMILES extraction.}
+After parsing, the extracted text is tokenised by whitespace and punctuation
+delimiters.  Each token is checked against a character-level filter that
+retains only strings compatible with the SMILES alphabet
+($[\texttt{A-Za-z0-9=\#:+-[]()/\textbackslash @.\%}]^+$)
+and additionally requires at least one carbon atom—either an uppercase
+\texttt{C} (aliphatic carbon) or more than two lowercase \texttt{c}
+characters (indicative of an aromatic ring).  Remaining
+candidates are validated with RDKit~\citep{rdkit}: a candidate is accepted if
+and only if \texttt{MolFromSmiles} succeeds, the resulting molecule can be
+written to a Mol block, and it does not contain a bridged ring system
+(defined as two rings sharing more than two atoms).
+
+If no valid SMILES is found, the reward is set to zero.  If more than one
+distinct valid SMILES is extracted from a single completion, the reward is
+also set to zero, as the model is expected to generate a single unambiguous
+molecule.
+
+\paragraph{Property computation.}
+For each valid SMILES, the required molecular properties are evaluated using
+a \textsc{ScorerRegistry} Ray actor that lazily initialises per-property
+evaluators:
+
+\begin{itemize}
+  \item \textit{Docking scores} are computed via GPU-accelerated AutoDock-GPU
+        \citep{autodock_gpu}.  Ligands are prepared using
+        Meeko~\citep{meeko} (3-D conformer generation followed by
+        PDBQT conversion).  Multiple docking actor replicas run concurrently,
+        with a configurable number of actors per GPU (default 8), to maintain
+        high GPU occupancy when the request buffer contains many distinct
+        molecules.
+  \item \textit{Drug-likeness and physicochemical descriptors} such as QED
+        \citep{qed}, synthetic accessibility (SA)~\citep{sa_score},
+        and a broad set of RDKit descriptors (molecular weight, topological
+        polar surface area, fraction of \textit{sp}$^3$ carbons, etc.) are
+        evaluated directly in-process.
+  \item \textit{Bioactivity classifiers} (e.g., GSK3$\beta$, JNK3, DRD2
+        inhibition probability) are retrieved from the TDC
+        library~\citep{tdc}.
+\end{itemize}
+
+\paragraph{Reward normalisation.}
+Raw property values are rescaled to $[0, 1]$ using property-specific linear
+transformations derived from the distribution of the property over a
+reference molecular database.  For docking scores, the rescaling is
+$\tilde{r} = (\Delta G + 11) / 10$, which maps a docking score of
+$\Delta G = -10~\text{kcal/mol}$ to $\tilde{r}=0.1$ and
+$\Delta G = -7~\text{kcal/mol}$ to $\tilde{r}=0.4$.  Because AutoDock-GPU
+reports binding free energies as negative numbers (more negative $= $ stronger
+binding), a good binder receives a \emph{lower} rescaled value $\tilde{r}$.
+The \textit{minimize} objective (see below) is therefore applied to docking
+targets so that a stronger binder ultimately receives a higher reward
+$r = 1 - \tilde{r}$.
+
+\paragraph{Per-property reward functions.}
+Given a rescaled property value $v$ and a target $\tau$, the contribution of
+each property to the overall reward depends on the declared objective:
+\begin{align}
+  r_{\text{below}}  &= \mathbf{1}[v \leq \tau],    \\
+  r_{\text{above}}  &= \mathbf{1}[v \geq \tau],    \\
+  r_{\text{maximize}} &= v,                         \\
+  r_{\text{minimize}} &= 1 - v,                     \\
+  r_{\text{equal}} &= \mathrm{clip}\!\left(1 - 100\,(v-\tau)^2,\ 0,\ 1\right).
+\end{align}
+
+\paragraph{Multi-property aggregation.}
+When a query specifies $K$ properties with individual rewards
+$r_1,\ldots,r_K$, the final generation reward is their geometric mean:
+\begin{equation}
+  \label{eq:geo_mean}
+  R = \left(\prod_{k=1}^{K} r_k\right)^{1/K}.
+\end{equation}
+The geometric mean is preferred over the arithmetic mean because it enforces
+that a molecule must achieve a satisfactory score on \emph{all} properties
+simultaneously: a zero score on any single property collapses the aggregate
+reward to zero regardless of performance on the others.
+
+%----------------------------------------------------------------------
+\subsection{Molecular Property Verifier}
+\label{app:verifier:molprop}
+
+The molecular property verifier is applied when the model is asked to
+\textit{predict} the value of a molecular property, rather than generate a
+new molecule.  After parsing, the extracted answer string is scanned for
+numerical expressions using a set of regular-expression patterns that handle
+plain floats, scientific notation (\textit{e.g.}, $1.3 \times 10^{-5}$,
+\texttt{1.3e-5}), HTML \texttt{<sup>} markup, LaTeX notation
+(\texttt{\textbackslash{}times 10\textasciicircum\{-5\}}), Unicode superscript
+digits, and plus-minus uncertainty expressions
+(\textit{e.g.}, $-2.1 \pm 0.5 \to -2.1$).  Range expressions of the forms
+``$a$ to $b$'' and ``between $a$ and $b$'' are resolved to their midpoint.
+
+If exactly one numerical value can be unambiguously extracted, the reward is
+computed according to the declared objective:
+
+\begin{itemize}
+  \item \textit{Regression}: The reward is
+        $r = \mathrm{clip}(1 - ((v - \tau) / \sigma)^2,\ 0,\ 1)$, where
+        $\sigma$ is a per-property normalisation factor derived from the
+        dataset variance.  This penalises deviations from the ground-truth
+        value $\tau$ quadratically, rewarding close but imperfect predictions
+        and giving zero reward beyond a distance of $\sigma$ from the target.
+  \item \textit{Classification}: The reward is $r = \mathbf{1}[\hat{y} = y]$,
+        where $y \in \{0, 1\}$ is the ground-truth label and $\hat{y}$ is
+        extracted from the answer by matching canonical keywords
+        (\textit{true}, \textit{yes}, \textit{1}~$\to$~1; \textit{false},
+        \textit{no}, \textit{0}~$\to$~0).
+\end{itemize}
+
+Ambiguous or unextractable answers receive a reward of zero.
+
+%----------------------------------------------------------------------
+\subsection{Reaction Verifier}
+\label{app:verifier:reaction}
+
+The reaction verifier evaluates model responses to retrosynthetic planning
+and forward-reaction tasks.  It relies on a pre-computed
+\textit{reactant–reaction matrix}, a data structure that encodes, for each
+catalogued building block, all reaction templates in which it can participate
+and the expected product(s).  This matrix is loaded at server startup and
+shared across all Ray workers.
+
+\paragraph{Task types.}
+The verifier supports several task configurations:
+
+\begin{itemize}
+  \item \textit{Final-product prediction}: The model predicts the product of a
+        given reaction; the reward is 1 if the predicted SMILES is identical
+        (after canonical form normalisation with RDKit) to the ground-truth
+        product, and 0 otherwise.
+  \item \textit{Reactant identification}: The model identifies one or more
+        reactants required to synthesise a given target; correctness is
+        assessed against the ground-truth reactant set.
+  \item \textit{Full retrosynthetic path}: The model proposes a multi-step
+        synthesis route.  Each proposed reaction step is validated against the
+        reaction matrix.  The reward has two components:
+        \begin{enumerate}
+          \item \emph{Validity}: the fraction of reaction steps that are
+                chemically valid according to the reaction matrix,
+                $r_{\text{valid}} \in [0, 1]$;
+          \item \emph{Product similarity}: either the binary indicator that the
+                final product exactly matches the target molecule, or the
+                Tanimoto coefficient between the Morgan fingerprints of the
+                final product and the target
+                (configurable via the \texttt{reaction\_reward\_type}
+                parameter).
+        \end{enumerate}
+        The overall reward is $R = r_{\text{valid}} \cdot r_{\text{product}}$.
+  \item \textit{Building-block constrained tasks}: Variants of the above in
+        which all proposed reactants must belong to a restricted catalogue of
+        commercially available building blocks.  Steps using out-of-catalogue
+        building blocks are penalised accordingly.
+\end{itemize}
