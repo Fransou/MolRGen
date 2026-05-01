@@ -165,6 +165,10 @@ class DockingOutput(BaseModel):
     smi: str = Field(
         ..., description="The SMILES string corresponding to this docking output."
     )
+    pdbqt_output_path: Optional[str] = Field(
+        default=None,
+        description="Optional path to the saved docked PDBQT file.",
+    )
 
 
 class BaseDocking:  # Keep base class fo BC and future softwares
@@ -184,6 +188,7 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         print_output: bool = False,
         debug: bool = True,
         docking_concurrency_per_gpu: int = 8,
+        pdbqt_output_dir: Optional[str] = None,
     ) -> None:
         """Initialize the base docking class.
 
@@ -200,6 +205,7 @@ class BaseDocking:  # Keep base class fo BC and future softwares
             print_output: Show docking output in console (True) or not (False).
             debug: Profiling the docking process and ligand preparation.
             docking_concurrency_per_gpu: Number of concurrent docking processes to run on each GPU.
+            pdbqt_output_dir: Optional directory path to save docked PDBQT files.
         """
         self.logger = logging.getLogger(
             __name__ + "/" + self.__class__.__name__,
@@ -218,6 +224,10 @@ class BaseDocking:  # Keep base class fo BC and future softwares
         self.print_output = print_output
         self.debug = debug
         self.docking_concurrency_per_gpu = docking_concurrency_per_gpu
+        self.pdbqt_output_dir = pdbqt_output_dir
+
+        if self.pdbqt_output_dir is not None:
+            make_dir(self.pdbqt_output_dir, exist_ok=True)
 
         if debug:
             self.preparation_profiler = TimedProfiler()
@@ -377,6 +387,9 @@ class BaseDocking:  # Keep base class fo BC and future softwares
             output_dir_path=output_dir_path,
             receptor_file=receptor_file,
         )
+        # Save pdbqt files to specified output directory if provided
+        if self.pdbqt_output_dir is not None:
+            self._save_pdbqt_files(ligand_dir_path, output, ligand_paths_by_smiles)
 
         # clean up temp dirs
         ligand_tempdir.cleanup()
@@ -414,6 +427,34 @@ class BaseDocking:  # Keep base class fo BC and future softwares
             NotImplementedError: Must be implemented by subclasses.
         """
         raise NotImplementedError
+
+    def _save_pdbqt_files(
+        self,
+        ligand_dir_path: str,
+        docking_outputs: List[DockingOutput],
+        ligand_paths_by_smiles: Dict[str, List[str]],
+    ) -> None:
+        """Save pdbqt files to the specified output directory.
+
+        Args:
+            ligand_dir_path: Path to directory containing prepared ligand files.
+            docking_outputs: List of DockingOutput objects to update with file paths.
+        """
+        if self.pdbqt_output_dir is None:
+            return
+
+        # Find all pdbqt files in the ligand directory
+        for file in os.listdir(self.pdbqt_output_dir):
+            # Update the corresponding DockingOutput with the path
+            for output in docking_outputs:
+                for smi_res_path in ligand_paths_by_smiles.get(output.smi, []):
+                    os.path.basename(file)
+                    if os.path.basename(smi_res_path).replace(
+                        ".pdbqt", ""
+                    ) == os.path.basename(file).replace("-best.pdbqt", ""):
+                        output.pdbqt_output_path = os.path.abspath(
+                            f"{self.pdbqt_output_dir}/{file}"
+                        )
 
     def dock_smis(
         self, smi: List[str], receptor_file: str
@@ -460,6 +501,7 @@ class AutoDockGPUDocking(BaseDocking):
         debug: bool = True,
         agg_type: Literal["mean", "min", "cluster_min"] = "min",
         docking_concurrency_per_gpu: int = 8,
+        pdbqt_output_dir: Optional[str] = None,
     ) -> None:
         """Initialize AutoDock GPU docking.
 
@@ -477,6 +519,7 @@ class AutoDockGPUDocking(BaseDocking):
             debug: Profiling the docking process and ligand preparation.
             agg_type: Aggregation type for docking scores ('mean', 'min', 'cluster_min').
             docking_concurrency_per_gpu: Number of concurrent docking processes per GPU.
+            pdbqt_output_dir: Optional directory path to save docked PDBQT files.
         """
         super().__init__(
             cmd=cmd,
@@ -491,8 +534,11 @@ class AutoDockGPUDocking(BaseDocking):
             print_output=print_output,
             debug=debug,
             docking_concurrency_per_gpu=docking_concurrency_per_gpu,
+            pdbqt_output_dir=pdbqt_output_dir,
         )
         self.cmd = cmd + " --filelist {filelist}" + " --ffile {ffile}"  # grid_map_file
+        if self.pdbqt_output_dir is not None:
+            self.cmd += " --gbest 1"
         if additional_args is not None:
             for k, v in additional_args.items():
                 self.cmd += f" {k} {v} "
@@ -553,6 +599,17 @@ class AutoDockGPUDocking(BaseDocking):
         output_paths = [
             file for file in os.listdir(ligand_dir_path) if file.endswith(".dlg")
         ]
+        if self.pdbqt_output_dir is not None:
+            poses_files = [
+                file
+                for file in os.listdir(ligand_dir_path)
+                if file.endswith("-best.pdbqt")
+            ]
+            # Move the files to the pdbqt_output_dir
+            for f in poses_files:
+                shutil.copyfile(
+                    f"{ligand_dir_path}/{f}", f"{self.pdbqt_output_dir}/{f}"
+                )
 
         # Something went horribly wrong
         if output_paths == []:

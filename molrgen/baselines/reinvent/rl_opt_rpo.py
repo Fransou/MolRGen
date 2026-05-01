@@ -7,7 +7,6 @@ from typing import Callable, Tuple
 
 import numpy as np
 import pandas as pd
-import wandb
 from datasets import Dataset
 from rdkit import RDLogger
 from rdkit.Chem import MolFromSmiles
@@ -18,6 +17,7 @@ from transformers import (
 )
 from trl import GRPOConfig
 
+import wandb
 from molrgen.baselines.reinvent.trainers import (
     N_REPEAT_TEST,
     EvalMolMetrics,
@@ -54,7 +54,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset",
         type=str,
-        default="data/molgendata/eval_data/eval_prompts.jsonl",
+        default="data/molgendata/eval_data/eval_prompts_ood.jsonl",
         help="Dataset name",
     )
     parser.add_argument("--datasets-path", type=str, default="data/molgendata")
@@ -74,7 +74,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--num_train_epochs",
         type=int,
-        default=100,
+        default=10,
         help="Number of training epochs",
     )
     parser.add_argument(
@@ -103,13 +103,13 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--batch_size",
         type=int,
-        default=512,
+        default=64,
         help="Batch size for training and evaluation",
     )
     parser.add_argument(
         "--eval_batch_size",
         type=int,
-        default=64,
+        default=16,
         help="Batch size for training and evaluation",
     )
     parser.add_argument(
