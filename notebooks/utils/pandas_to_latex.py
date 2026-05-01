@@ -633,7 +633,6 @@ class PandasTableFormatter:
             column_format = ""
             if isinstance(cols_sep, int):
                 for idx in style.data.index.names:
-                    print(idx)
                     column_format += "c|"
                 # cols reprents the level of the multindex we want to separate
                 assert cols_sep <= style.data.columns.nlevels - 1

@@ -21,8 +21,10 @@ CMAP_MODELS = {
     "ChemDFM-R": palette[-2],
     "ChemDFM-v2.0": palette[-2],
     "ether0": palette[-4],
-    "RL-Mistral": palette[0],
-    "RL-Molstral": palette[0],
+    "RL-Molstral-g4": palette[0],
+    "RL-Molstral-g8": palette[1],
+    "RL-Molstral-g16": palette[2],
+    "RL-Mistral": palette[-1],
 }
 
 CMAP_MODELS.update(
@@ -43,8 +45,10 @@ CMAP_MODELS.update(
 )
 MARKER_MODELS = {
     # Chemistry-specialized models
-    "RL-Mistral": "X",
-    "RL-Molstral": "p",
+    "RL-Molstral-g4": "p",
+    "RL-Molstral-g8": "X",
+    "RL-Molstral-g16": "D",
+    "RL-Mistral": "o",
     "ChemDFM-R": "^",
     "ChemDFM-v2.0": "o",
     "ether0": "v",
@@ -63,7 +67,7 @@ MARKER_MODELS = {
 }
 
 # Models to highlight in plots
-HIGHLIGHT_MODELS = ["ChemDFM-R", "gemma-4", "RL-Molstral", "Mistral-Small-4"]
+HIGHLIGHT_MODELS = ["ChemDFM-R", "gemma-4", "RL-Molstral-g16", "Mistral-Small-4"]
 
 # =============================================================================
 # Public API

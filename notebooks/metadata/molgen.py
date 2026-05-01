@@ -64,4 +64,9 @@ MODEL_META = {
         "Chem.": False,
         "size": "128B",
     },
+    "ZINC": {
+        "thinking": False,
+        "Chem.": False,
+        "size": "n/a",
+    },
 }

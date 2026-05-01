@@ -261,12 +261,12 @@ def plot_div_topk(
         leg = g.fig.legend(
             handles=handles,
             labels=labels,
-            title="Model",
+            # title="Model",
             loc="lower center",
             bbox_to_anchor=legend_bbox,
             ncol=legend_ncols,
-            fontsize=8,
-            title_fontsize=10,
+            fontsize=10,
+            # title_fontsize=10,
         )
         # Ensure legend background is fully opaque
         leg.get_frame().set_alpha(1.0)
@@ -280,6 +280,7 @@ def run_figure(config_path: Path, display: bool) -> None:
     """Generate figure(s) from config. Handles single or multiple fingerprints."""
     config = load_config(config_path)
     df, sub_sample_prompts = load_data(config)
+    df = df[df.prompt_id.isin(sub_sample_prompts[:])]
     fig_path, full_output_path = setup_paths(config)
 
     plot_config = config["plot"]
