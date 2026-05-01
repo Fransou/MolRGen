@@ -7,6 +7,7 @@ from typing import Callable, Tuple
 
 import numpy as np
 import pandas as pd
+import yaml
 from datasets import Dataset
 from rdkit import RDLogger
 from rdkit.Chem import MolFromSmiles
@@ -43,13 +44,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def load_yaml_config(config_path: str) -> dict:
+    """
+    Load configuration from YAML file.
+
+    Args:
+        config_path: Path to YAML configuration file
+
+    Returns:
+        Dictionary containing configuration values
+    """
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
+    return config if config is not None else {}
+
+
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="""
         Adaptation of REINVENT with GRPO to generate molecules based on an optimization objective.
 
         After training, all logs, generated molecules, and similarity matrix will be saved in the specified output directory.
+
+        Configuration can be loaded from a YAML file using --config. Command-line arguments override YAML values.
         """
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to YAML configuration file. Command-line arguments override config file values.",
     )
     parser.add_argument(
         "--dataset",
@@ -163,7 +187,23 @@ def get_args() -> argparse.Namespace:
         help="Initial pattern for the generation. Can be the bos token, i.e <s>, or the bos token followed by the beginning of a SMILES string.",
     )
 
+    # Parse arguments twice: first to get config file, then to set defaults from config
+    args, remaining = parser.parse_known_args()
+
+    # If a config file is specified, load it and set as defaults
+    if args.config:
+        logger.info(f"Loading configuration from {args.config}")
+        config_dict = load_yaml_config(args.config)
+
+        # Set defaults from config file
+        for key, value in config_dict.items():
+            if hasattr(args, key) and key != "config":
+                setattr(args, key, value)
+
+    # Parse arguments again with potentially updated defaults
+    # This ensures command-line arguments override config file values
     args = parser.parse_args()
+
     args.output_dir = os.path.join(
         args.output_dir, args.model_name.replace("/", "-") + "_rl"
     )

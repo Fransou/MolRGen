@@ -8,6 +8,10 @@
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --array=0-0
 
+
+# $1: output
+# $2: config
+
 DATASET=molgendata
 
 export RAY_TMPDIR=$SLURM_TMPDIR/ray
@@ -39,6 +43,15 @@ export FLASHINFER_WORKSPACE_BASE=$SLURM_TMPDIR/flashinfer/workspace
 export FLASHINFER_HOME=$SLURM_TMPDIR/flashinfer
 
 ray start --head --node-ip-address 0.0.0.0 --dashboard-port=$DASHBOARD_PORT
+
+BUFFER_TIME=1 PARSING_METHOD=none SERVER_MODE=batch python molrgen/server.py &
+sleep 120
+
+python molrgen/baselines/reinvent/rl_opt_rpo.py \
+  --dataset $SCRATCH/MolGenData/$DATASET/eval_prompts_ood.jsonl \
+  --model_name $SCRATCH/Franso/Franso-reinvent_229M_256_prior \
+  --output_dir $SCRATCH/MolGenOutput/reinvent/$1-$SLURM_TMPDIR \
+  --id_obj $SLURM_TMPDIR \
 
 
 #export DEBUG_MODE=1
