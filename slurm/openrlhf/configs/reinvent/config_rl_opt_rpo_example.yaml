@@ -1,5 +1,5 @@
 # Training hyperparameters
-num_train_epochs: 10
+num_train_epochs: 100
 learning_rate: 1.0e-5
 lr_scheduler_type: "linear"
 lr_warmup_ratio: 0.1

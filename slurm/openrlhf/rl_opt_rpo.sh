@@ -46,37 +46,12 @@ ray start --head --node-ip-address 0.0.0.0 --dashboard-port=$DASHBOARD_PORT
 
 BUFFER_TIME=1 PARSING_METHOD=none SERVER_MODE=batch python molrgen/server.py &
 sleep 120
+wandb offline
 
 python molrgen/baselines/reinvent/rl_opt_rpo.py \
   --dataset $SCRATCH/MolGenData/$DATASET/test_data/test_prompts_ood.jsonl \
   --model_name $SCRATCH/Franso/Franso-reinvent_229M_256_prior \
   --output_dir $SCRATCH/MolGenOutput/reinvent/$1-$SLURM_TMPDIR \
   --id_obj $SLURM_ARRAY_TASK_ID
-
-
-#export DEBUG_MODE=1
-ray job submit \
-   --address="http://127.0.0.1:$DASHBOARD_PORT" \
-   --runtime-env-json='{"setup_commands": ["wandb offline"]}' \
-   -- python3 -m openrlhf.cli.batch_inference \
-   --config $CONFIG \
-   --iter $SLURM_ARRAY_TASK_ID
-
-
-export docking_oracle=autodock_gpu
-export scorer_exhaustiveness=4
-
-if [ "$DATASET" == "molgendata" ]; then
-    python -m molrgen.score_completions \
-      --iter $SLURM_ARRAY_TASK_ID \
-      --input_file $CONFIG \
-      --batch_size 256 \
-      --mol-generation
-else
-    python -m molrgen.score_completions \
-      --iter $SLURM_ARRAY_TASK_ID \
-      --input_file $CONFIG \
-      --batch_size 1024
-fi
 
 ray stop || true
