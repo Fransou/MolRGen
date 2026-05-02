@@ -36,10 +36,6 @@ os.environ["WANDB_PROJECT"] = "REINVENT_HF-RL"
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.FileHandler("rl_opt_rpo.log"),
-        logging.StreamHandler(),
-    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -245,6 +241,7 @@ def run_training(
         logging_strategy="steps",
         save_strategy="steps",
         eval_strategy="steps",
+        report_to="wandb",
         save_steps=10,
         eval_steps=10,
         logging_steps=1,

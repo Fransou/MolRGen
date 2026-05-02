@@ -48,10 +48,10 @@ BUFFER_TIME=1 PARSING_METHOD=none SERVER_MODE=batch python molrgen/server.py &
 sleep 120
 
 python molrgen/baselines/reinvent/rl_opt_rpo.py \
-  --dataset $SCRATCH/MolGenData/$DATASET/eval_prompts_ood.jsonl \
+  --dataset $SCRATCH/MolGenData/$DATASET/test_data/test_prompts_ood.jsonl \
   --model_name $SCRATCH/Franso/Franso-reinvent_229M_256_prior \
   --output_dir $SCRATCH/MolGenOutput/reinvent/$1-$SLURM_TMPDIR \
-  --id_obj $SLURM_TMPDIR \
+  --id_obj $SLURM_ARRAY_TASK_ID
 
 
 #export DEBUG_MODE=1
