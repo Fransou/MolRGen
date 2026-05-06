@@ -1,0 +1,95 @@
+/* Custom color variables */
+:root {
+  --md-primary-fg-color: #a28eff;        /* Primary blue */
+  --md-primary-fg-color--light: #b5a3fc;
+  --md-primary-fg-color--dark: #9682e6;
+  --md-accent-fg-color: #2e2c38;         /* Accent cyan */
+  --dummy: #ff0000;
+
+
+  /* Secondary colors */
+  --md-footer-bg-color: #a28eff;
+  --md-footer-fg-color: #000000;
+}
+
+/* Increase header height */
+.md-header {
+  background-color: var(--md-primary-fg-color);
+  height: 4rem;
+}
+
+/* Increase logo size */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 3rem;
+  width: auto;
+}
+
+/* Adjust header inner container */
+.md-header__inner {
+  height: 4rem;
+}
+
+/* Adjust header title font size */
+.md-header__title {
+  font-size: 1.2rem;
+}
+
+/* Make GitHub icon and text white */
+.md-header__source {
+  color: white;
+}
+
+.md-header__source .md-source__icon svg {
+  fill: white;
+}
+
+.md-header__source .md-source__repository {
+  color: white;
+}
+
+/* Custom styling for the main navigation tabs */
+.md-tabs {
+  background-color: var(--md-primary-fg-color--light);
+}
+
+/* Custom styling for links */
+a {
+  color: var(--md-accent-fg-color);
+}
+
+a:hover {
+  color: var(--md-primary-fg-color--light);
+}
+
+/* Custom styling for buttons */
+.md-button {
+  background-color: var(--md-primary-fg-color);
+  color: white;
+}
+
+.md-button:hover {
+  background-color: var(--md-primary-fg-color--dark);
+}
+
+/* Custom home page styling */
+.md-content--home {
+  max-width: 100%;
+}
+
+.md-content--home h1 {
+  color: var(--md-primary-fg-color);
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+}
+
+div.doc-object.doc-class {
+  padding-bottom: 1.2rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* Remove separator after last class */
+div.doc-object.doc-class:last-of-type {
+  border-bottom: none;
+}
