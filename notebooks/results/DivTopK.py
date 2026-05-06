@@ -130,11 +130,11 @@ def plot_div_topk(
     height: float = 1.8,
     aspect: float = 2.5,
     markersize: dict[str, float] = {"normal": 5, "highlight": 7},
+    highlight_model: list[str] = HIGHLIGHT_MODELS,
     **kwargs: Any,
 ) -> sns.FacetGrid:
     def draw(data: pd.DataFrame, **kwargs: Any) -> None:
         # Separate highlighted and non-highlighted models
-
         kwargs.update(
             dict(
                 x=x,
@@ -167,8 +167,8 @@ def plot_div_topk(
         )
 
         # Draw highlighted models with enhanced styling (thicker lines, larger markers)
-        if len(HIGHLIGHT_MODELS) > 0:
-            for model in HIGHLIGHT_MODELS:
+        if len(highlight_model) > 0:
+            for model in highlight_model:
                 highlighted_data = data[data["Model"] == model]
                 sns.lineplot(
                     highlighted_data,
@@ -238,8 +238,8 @@ def plot_div_topk(
             if name not in df.Model.unique():
                 continue
             marker = MARKER_MODELS.get(name, None)
-            is_highlight = name in HIGHLIGHT_MODELS
-            lw = 1.4 if is_highlight else 1.0
+            is_highlight = name in highlight_model
+            lw = 1.1 if is_highlight else 0.9
             ms = markersize["highlight"] if is_highlight else markersize["normal"]
 
             if marker:
@@ -265,7 +265,7 @@ def plot_div_topk(
             loc="lower center",
             bbox_to_anchor=legend_bbox,
             ncol=legend_ncols,
-            fontsize=10,
+            fontsize=9,
             # title_fontsize=10,
         )
         # Ensure legend background is fully opaque
@@ -276,10 +276,12 @@ def plot_div_topk(
     return g
 
 
-def run_figure(config_path: Path, display: bool) -> None:
+def run_figure(config: dict, display: bool, df: pd.DataFrame | None = None) -> None:
     """Generate figure(s) from config. Handles single or multiple fingerprints."""
-    config = load_config(config_path)
-    df, sub_sample_prompts = load_data(config)
+    if df is None:
+        df, sub_sample_prompts = load_data(config)
+    else:
+        sub_sample_prompts = df.prompt_id.unique().tolist()
     df = df[df.prompt_id.isin(sub_sample_prompts[:])]
     fig_path, full_output_path = setup_paths(config)
 
@@ -335,6 +337,7 @@ def run_figure(config_path: Path, display: bool) -> None:
             "markersize": plot_config["markersize"],
             "sim_values": sim_values,
             "row_vals": plot_config.get("row_vals", None),
+            "highlight_model": plot_config.get("highlight_model", HIGHLIGHT_MODELS),
         }
 
         # Add optional k_max if present
@@ -386,22 +389,24 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.config_file:
-        run_figure(args.config_file, args.display)
+        config = config = load_config(args.config_file)
     else:
         if args.config in ["main", "all"]:
             print("=" * 50)
             print("Running main figure...")
             print("=" * 50)
-            run_figure(CONFIG_DIR / "main_figure.yaml", args.display)
+            config = load_config(CONFIG_DIR / "main_figure.yaml")
 
         if args.config in ["secondary", "all"]:
             print("=" * 50)
             print("Running secondary figures...")
             print("=" * 50)
-            run_figure(CONFIG_DIR / "secondary_figures.yaml", args.display)
+            config = load_config(CONFIG_DIR / "secondary_figures.yaml")
 
         if args.config in ["last", "all"]:
             print("=" * 50)
             print("Running last figure...")
             print("=" * 50)
-            run_figure(CONFIG_DIR / "last_figure.yaml", args.display)
+            config = load_config(CONFIG_DIR / "last_figure.yaml")
+
+        run_figure(config, args.display)

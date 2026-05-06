@@ -22,10 +22,10 @@ plot:
   fingerprints:
 #    - "ecfp4-2048"
 #    - "ecfp6-2048"
-    - "maccs"
+#    - "maccs"
 #    - "rdkit"
 #    - "Avalon"
-#    - "Gobbi2d"
+    - "Gobbi2d"
   legend_fingerprint: "Avalon"  # Only this fingerprint gets a legend
   cols_vals:
     - 4

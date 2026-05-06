@@ -74,7 +74,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset",
         type=str,
-        default="data/molgendata/eval_data/eval_prompts_ood.jsonl",
+        default="data/molgendata/test_data/test_prompts_ood.jsonl",
         help="Dataset name",
     )
     parser.add_argument("--datasets-path", type=str, default="data/molgendata")

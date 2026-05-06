@@ -71,8 +71,14 @@ def load_molprop_results(
                     else:
                         match = ""
                     contains_numeric = bool(re.search(float_pattern, match))
-                    reward_meta = g["reward_meta"]["mol_prop_verifier_metadata"]
-                    valid = reward_meta.get("extracted_answer", -10000.0) != -10000.0
+                    if "mol_prop_verifier_metadata" not in g["reward_meta"]:
+                        reward_meta = {}
+                        valid = False
+                    else:
+                        reward_meta = g["reward_meta"]["mol_prop_verifier_metadata"]
+                        valid = (
+                            reward_meta.get("extracted_answer", -10000.0) != -10000.0
+                        )
                     objective = g["metadata"]["objectives"][0]
                     target = float(g["metadata"]["target"][0])
                     norm_var = float(g["metadata"]["norm_var"])

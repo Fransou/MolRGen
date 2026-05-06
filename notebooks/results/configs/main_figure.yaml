@@ -36,13 +36,13 @@ plot:
   xlabel_x: 0.5
   ylabel_x: 0.04
   legend: true
-  legend_bbox: [1.07, 0.1]
+  legend_bbox: [1.07, 0.2]
   legend_ncols: 1
   height: 2.2
-  aspect: 1.5
+  aspect: 1.35
   markersize:
     normal: 5
-    highlight: 7
+    highlight: 6
 
 sim_values:
   type: "logspace"

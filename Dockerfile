@@ -50,6 +50,7 @@ RUN apt-get update && \
 
 WORKDIR /opt/build
 RUN git clone https://github.com/ccsb-scripps/AutoDock-GPU.git && \
+    cd AutoDock-GPU && \
     git checkout v1.6
 
 ENV GPU_INCLUDE_PATH=/usr/local/cuda/include
@@ -106,11 +107,3 @@ RUN echo '#!/bin/bash' > /usr/local/bin/docker-entrypoint.sh && \
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["/bin/bash"]
-{
-  "smiles": [
-    "CCCCC"
-  ],
-  "properties": [
-    "sample_347546_model_0"
-  ]
-}

@@ -203,3 +203,7 @@ oracle
 *.sqsh
 
 /MolGenDocking-latex
+
+/*.csv
+/*.png
+/chimerax_script

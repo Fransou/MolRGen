@@ -25,6 +25,7 @@ CMAP_MODELS = {
     "RL-Molstral-g8": palette[1],
     "RL-Molstral-g16": palette[2],
     "RL-Mistral": palette[-1],
+    "Reinvent-STD": palette[3],
 }
 
 CMAP_MODELS.update(
@@ -52,6 +53,7 @@ MARKER_MODELS = {
     "ChemDFM-R": "^",
     "ChemDFM-v2.0": "o",
     "ether0": "v",
+    "Reinvent-STD": "*",
     # Reasoning models
     "MiniMax-M2": "h",
     "Qwen3": "s",
@@ -67,7 +69,13 @@ MARKER_MODELS = {
 }
 
 # Models to highlight in plots
-HIGHLIGHT_MODELS = ["ChemDFM-R", "gemma-4", "RL-Molstral-g16", "Mistral-Small-4"]
+HIGHLIGHT_MODELS = [
+    "ChemDFM-R",
+    "gemma-4",
+    "RL-Molstral-g16",
+    "Mistral-Small-4",
+    "Reinvent-STD",
+]
 
 # =============================================================================
 # Public API
