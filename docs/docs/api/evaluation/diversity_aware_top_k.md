@@ -45,7 +45,7 @@ The metric uses **molecular fingerprints** to compute similarity:
 ### Basic Usage with SMILES
 
 ```python
-from mol_gen_docking.evaluation.diversity_aware_top_k import diversity_aware_top_k
+from molrgen.evaluation.diversity_aware_top_k import diversity_aware_top_k
 
 # Generated molecules as SMILES
 smiles = [
@@ -85,7 +85,7 @@ print(f"Diversity-aware top-2 score: {metric}")
 ### Using RDKit Mol Objects
 
 ```python
-from mol_gen_docking.evaluation.diversity_aware_top_k import diversity_aware_top_k
+from molrgen.evaluation.diversity_aware_top_k import diversity_aware_top_k
 from rdkit import Chem
 
 # Convert to Mol objects
@@ -103,7 +103,7 @@ print(metric)
 
 ```python
 import numpy as np
-from mol_gen_docking.evaluation.diversity_aware_top_k import diversity_aware_top_k
+from molrgen.evaluation.diversity_aware_top_k import diversity_aware_top_k
 
 # Pre-computed similarity matrix (diagonal = 1.0)
 sim_matrix = np.array([
@@ -132,7 +132,7 @@ print(metric)
 ## Function Reference
 
 
-::: mol_gen_docking.evaluation.diversity_aware_top_k
+::: molrgen.evaluation.diversity_aware_top_k
     options:
         show_root_toc_entry: false
         heading_level: 3

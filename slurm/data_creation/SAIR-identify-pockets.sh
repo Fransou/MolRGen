@@ -29,7 +29,7 @@ cp $data_path/sair.parquet $SLURM_TMPDIR/sair_$SLURM_ARRAY_TASK_ID
 ray start --head --node-ip-address 0.0.0.0
 
 cd $WORKING_DIR
-python mol_gen_docking/data/SAIR_identify_pockets.py \
+python molrgen/data/SAIR_identify_pockets.py \
   --sair-dir $SLURM_TMPDIR/sair_$SLURM_ARRAY_TASK_ID \
   --output-dir $SLURM_TMPDIR/sair_pockets \
   --iou-threshold 0.6 \

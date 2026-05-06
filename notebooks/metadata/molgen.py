@@ -59,4 +59,14 @@ MODEL_META = {
         "thinking": False,
         "Chem.": True,
     },
+    "Mistral-Small-4": {
+        "thinking": True,
+        "Chem.": False,
+        "size": "128B",
+    },
+    "ZINC": {
+        "thinking": False,
+        "Chem.": False,
+        "size": "n/a",
+    },
 }

@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from mol_gen_docking.data.pydantic_dataset import read_jsonl
-from mol_gen_docking.reward import (
+from molrgen.data.pydantic_dataset import read_jsonl
+from molrgen.reward import (
     MolecularVerifier,
     MolecularVerifierConfigModel,
     ReactionVerifierConfigModel,

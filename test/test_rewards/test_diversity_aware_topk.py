@@ -5,11 +5,11 @@ import pytest
 from rdkit import Chem
 from scipy.spatial.distance import squareform
 
-from mol_gen_docking.evaluation.diversity_aware_top_k import (
+from molrgen.evaluation.diversity_aware_top_k import (
     div_aware_top_k_from_dist,
     diversity_aware_top_k,
 )
-from mol_gen_docking.evaluation.fingeprints_utils import get_sim_matrix
+from molrgen.evaluation.fingeprints_utils import get_sim_matrix
 
 TEST_DIV_AWARE_TOPK_FROM_DIST = [
     {

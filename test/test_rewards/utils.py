@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 from rdkit import Chem
 
-from mol_gen_docking.utils.property_utils import (
+from molrgen.utils.property_utils import (
     CLASSICAL_PROPERTIES_NAMES,
     has_bridged_bond,
     inverse_rescale_property_values,

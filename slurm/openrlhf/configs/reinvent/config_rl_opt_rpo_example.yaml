@@ -1,0 +1,15 @@
+# Training hyperparameters
+num_train_epochs: 100
+learning_rate: 1.0e-5
+lr_scheduler_type: "linear"
+lr_warmup_ratio: 0.1
+weight_decay: 0.01
+
+# Batch sizes
+batch_size: 64
+eval_batch_size: 16
+gradient_accumulation_steps: 1
+
+# Model-specific parameters
+sigma: 0.1
+loss_type: "dapo"  # choices: "grpo", "dr_grpo", "dapo"

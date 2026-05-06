@@ -7,12 +7,12 @@ import pytest
 import torch
 from rdkit import Chem
 
-from mol_gen_docking.reward import (
+from molrgen.reward import (
     GenerationVerifierConfigModel,
     MolecularVerifier,
     MolecularVerifierConfigModel,
 )
-from mol_gen_docking.utils.property_utils import (
+from molrgen.utils.property_utils import (
     has_bridged_bond,
 )
 

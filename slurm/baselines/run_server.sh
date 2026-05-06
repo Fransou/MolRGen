@@ -30,5 +30,5 @@ if [ "$2" == "head" ]; then
 
     export docking_oracle=autodock_gpu
     export scorer_exhaustiveness=4
-    uvicorn --host $1 --port 5001 mol_gen_docking.server:app &
+    uvicorn --host $1 --port 5001 molrgen.server:app &
 fi

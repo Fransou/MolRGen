@@ -23,7 +23,7 @@ export DATA_PATH=$SLURM_TMPDIR/$DATASET
 source $HOME/OpenRLHF/bin/activate
 
 ray start --head --node-ip-address 0.0.0.0
-python mol_gen_docking/data/meeko_process.py --data_path $DATA_PATH
+python molrgen/data/meeko_process.py --data_path $DATA_PATH
 
 cd $SLURM_TMPDIR
 rm $DATASET/*.csv  # Remove original CSV files to save space

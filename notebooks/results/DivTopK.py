@@ -148,8 +148,8 @@ def plot_div_topk(
         sns.lineplot(
             data,
             sizes=1,
-            alpha=0.7,
-            linewidth=0.5,
+            alpha=0.4,
+            linewidth=1.1,
             legend=False,
             **kwargs,
         )
@@ -157,7 +157,7 @@ def plot_div_topk(
             data.iloc[2::3],
             style="Model",
             sizes=1,
-            alpha=0.7,
+            alpha=0.4,
             markers=MARKER_MODELS,
             markersize=markersize["normal"],
             linewidth=0.0,
@@ -174,7 +174,7 @@ def plot_div_topk(
                     highlighted_data,
                     sizes=1,
                     alpha=1,
-                    linewidth=1.6,
+                    linewidth=1.9,
                     legend=False,
                     **kwargs,
                 )
@@ -261,12 +261,12 @@ def plot_div_topk(
         leg = g.fig.legend(
             handles=handles,
             labels=labels,
-            title="Model",
+            # title="Model",
             loc="lower center",
             bbox_to_anchor=legend_bbox,
             ncol=legend_ncols,
-            fontsize=8,
-            title_fontsize=10,
+            fontsize=10,
+            # title_fontsize=10,
         )
         # Ensure legend background is fully opaque
         leg.get_frame().set_alpha(1.0)
@@ -280,6 +280,7 @@ def run_figure(config_path: Path, display: bool) -> None:
     """Generate figure(s) from config. Handles single or multiple fingerprints."""
     config = load_config(config_path)
     df, sub_sample_prompts = load_data(config)
+    df = df[df.prompt_id.isin(sub_sample_prompts[:])]
     fig_path, full_output_path = setup_paths(config)
 
     plot_config = config["plot"]
@@ -333,6 +334,7 @@ def run_figure(config_path: Path, display: bool) -> None:
             "aspect": plot_config["aspect"],
             "markersize": plot_config["markersize"],
             "sim_values": sim_values,
+            "row_vals": plot_config.get("row_vals", None),
         }
 
         # Add optional k_max if present

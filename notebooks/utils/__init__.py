@@ -10,46 +10,45 @@ from .molprop_utils import load_molprop_results
 from .pandas_to_latex import PandasTableFormatter
 from .synthesis_utils import load_synth_results
 
-N_COLORS = 16
+N_COLORS = 25
 palette = sns.husl_palette(
     n_colors=N_COLORS,
-    s=0.95,  # Saturation
-    l=0.62,  # Lightness
+    s=0.99,  # Saturation
+    l=0.64,  # Lightness
 )
 CMAP_MODELS = {
     # Chem models — muted reds
-    "ChemDFM-R": palette[0],
-    "ChemDFM-v2.0": palette[1],
-    "ether0": palette[2],
-    "RL-Mistral": palette[3],
-    "RL-Molstral": palette[4],
+    "ChemDFM-R": palette[-2],
+    "ChemDFM-v2.0": palette[-2],
+    "ether0": palette[-4],
+    "RL-Molstral-g4": palette[0],
+    "RL-Molstral-g8": palette[1],
+    "RL-Molstral-g16": palette[2],
+    "RL-Mistral": palette[-1],
 }
 
 CMAP_MODELS.update(
     {
         # Reasoning models — cool blues / teals
-        "MiniMax-M2": palette[6],
-        "Qwen3": palette[7],
-        "Qwen3-Next": palette[8],
-        "gpt-oss": palette[9],
-        "R1-Llama": palette[10],
-        "R1-Qwen": palette[11],
-    }
-)
-
-CMAP_MODELS.update(
-    {
+        "MiniMax-M2": palette[7],
+        "Qwen3": palette[9],
+        "Qwen3-Next": palette[9],
+        "gpt-oss": palette[11],
+        "R1-Llama": palette[13],
+        "R1-Qwen": palette[13],
+        "Mistral-Small-4": palette[15],
         # Non-reasoning models — warm greens / golds
-        "Llama-3.3": palette[13],
-        "gemma-3": palette[14],
-        "gemma-4": palette[15],
+        "Llama-3.3": palette[17],
+        "gemma-3": palette[19],
+        "gemma-4": palette[19],
     }
 )
 MARKER_MODELS = {
     # Chemistry-specialized models
-    "RL-Mistral": "X",
-    "RL-Mistral-100": "X",
-    "RL-Molstral": "X",
+    "RL-Molstral-g4": "p",
+    "RL-Molstral-g8": "X",
+    "RL-Molstral-g16": "D",
+    "RL-Mistral": "o",
     "ChemDFM-R": "^",
     "ChemDFM-v2.0": "o",
     "ether0": "v",
@@ -60,6 +59,7 @@ MARKER_MODELS = {
     "gpt-oss": "D",
     "R1-Llama": "P",
     "R1-Qwen": "X",
+    "Mistral-Small-4": "^",
     # Non-reasoning general models
     "Llama-3.3": "p",
     "gemma-3": "*",
@@ -67,7 +67,7 @@ MARKER_MODELS = {
 }
 
 # Models to highlight in plots
-HIGHLIGHT_MODELS = ["ChemDFM-R", "gemma-4", "RL-Molstral"]
+HIGHLIGHT_MODELS = ["ChemDFM-R", "gemma-4", "RL-Molstral-g16", "Mistral-Small-4"]
 
 # =============================================================================
 # Public API

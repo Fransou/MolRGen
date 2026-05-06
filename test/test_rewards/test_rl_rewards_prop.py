@@ -5,13 +5,13 @@ from typing import Any, List
 import numpy as np
 import pytest
 
-from mol_gen_docking.reward import (
+from molrgen.reward import (
     GenerationVerifierConfigModel,
     MolecularVerifier,
     MolecularVerifierConfigModel,
     MolPropVerifierConfigModel,
 )
-from mol_gen_docking.utils.property_utils import rescale_property_values
+from molrgen.utils.property_utils import rescale_property_values
 
 
 @pytest.fixture(scope="module", params=["answer_tags", "boxed"])  # type: ignore

@@ -29,7 +29,7 @@ ray start --head --node-ip-address 0.0.0.0
 
 export docking_oracle=pyscreener
 export scorer_exhaustiveness=4
-uvicorn --host 0.0.0.0 --port 5001 mol_gen_docking.server:app &
+uvicorn --host 0.0.0.0 --port 5001 molrgen.server:app &
 sleep 15
 
 wandb offline

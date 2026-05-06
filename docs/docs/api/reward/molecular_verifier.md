@@ -25,11 +25,11 @@ MolecularVerifier
 ### Basic Example
 
 ```python
-from mol_gen_docking.reward import (
+from molrgen.reward import (
     MolecularVerifier,
     MolecularVerifierConfigModel,
 )
-from mol_gen_docking.reward.verifiers import (
+from molrgen.reward.verifiers import (
     GenerationVerifierConfigModel,
     ReactionVerifierConfigModel,
     MolPropVerifierConfigModel
@@ -83,7 +83,7 @@ print(results.rewards)
 
 ```
 
-::: mol_gen_docking.reward.molecular_verifier_pydantic_model
+::: molrgen.reward.molecular_verifier_pydantic_model
     handler: python
     heading_level: 3
     options:
@@ -94,7 +94,7 @@ print(results.rewards)
 
 
 
-::: mol_gen_docking.reward.molecular_verifier
+::: molrgen.reward.molecular_verifier
     handler: python
     heading_level: 3
     options:

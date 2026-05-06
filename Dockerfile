@@ -19,7 +19,7 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Copy environment-related files first (for caching)
 COPY pyproject.toml ./
-COPY mol_gen_docking ./mol_gen_docking
+COPY molrgen ./molrgen
 COPY test ./test
 COPY data/properties.csv ./data/properties.csv
 
@@ -96,9 +96,9 @@ EXPOSE 8000
 # Create entry point script to handle command selection
 RUN echo '#!/bin/bash' > /usr/local/bin/docker-entrypoint.sh && \
     echo 'if [ "$1" = "mcp-server" ]; then' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '  exec BUFFER_TIME=1 PARSING_METHOD=none SERVER_MODE=batch python -m mol_gen_docking.server_mcp' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '  exec BUFFER_TIME=1 PARSING_METHOD=none SERVER_MODE=batch python -m molrgen.server_mcp' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'elif [ "$1" = "api-server" ]; then' >> /usr/local/bin/docker-entrypoint.sh && \
-    echo '  exec python -m mol_gen_docking.server' >> /usr/local/bin/docker-entrypoint.sh && \
+    echo '  exec python -m molrgen.server' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'else' >> /usr/local/bin/docker-entrypoint.sh && \
     echo '  exec "$@"' >> /usr/local/bin/docker-entrypoint.sh && \
     echo 'fi' >> /usr/local/bin/docker-entrypoint.sh && \

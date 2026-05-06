@@ -2,7 +2,7 @@
 
 ## Overview
 
-MolGenDocking addresses the challenge of *de novo* molecular generation, with a benchmark designed for Large Language Models (LLMs) and other generative architectures.
+MolRGen addresses the challenge of *de novo* molecular generation, with a benchmark designed for Large Language Models (LLMs) and other generative architectures.
 Our dataset currently supports 3 downstream tasks:
 
 | Dataset                            | Size           | Source                                                                                                       | Purpose                                                            |
@@ -62,7 +62,7 @@ tar -xzf synthesis_tasks.tar.gz
 
 ### Data Format
 
-Our data are stored in JSONL format, represented by a pydantic base model ([source](https://github.com/Fransou/MolGenDocking/blob/main/mol_gen_docking/data/pydantic_dataset.py)):
+Our data are stored in JSONL format, represented by a pydantic base model ([source](https://github.com/Fransou/MolRGen/blob/main/molrgen/data/pydantic_dataset.py)):
 
 ```python
 class Message(BaseModel):

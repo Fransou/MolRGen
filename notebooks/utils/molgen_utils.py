@@ -10,7 +10,7 @@ from rdkit.Chem import AllChem
 from scipy.spatial.distance import squareform
 from tqdm import tqdm
 
-from mol_gen_docking.evaluation.diversity_aware_top_k import div_aware_top_k_from_dist
+from molrgen.evaluation.diversity_aware_top_k import div_aware_top_k_from_dist
 
 from .utils import process_model_name
 
@@ -143,7 +143,7 @@ def agg_topk(
 ) -> Callable[[pd.DataFrame], float]:
     def w_fn(sub_df: pd.DataFrame) -> float:
         # print(len(x))
-        sub_df = sub_df[:n_rollout]
+        sub_df = sub_df.sample(n_rollout)
         sub_df = sub_df.sort_values(by=by, ascending=False)
         sub_df = sub_df.drop_duplicates(subset=by_dupl)
         # Pad with 0s

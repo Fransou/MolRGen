@@ -1,9 +1,9 @@
-site_name: MolGenDocking Documentation
+site_name: MolRGen Documentation
 site_description: Molecular Generation and Docking Benchmarks and Datasets
-site_url: https://github.com/Fransou/MolGenDocking
+site_url: https://github.com/Fransou/MolRGen
 site_author: Philippe
-repo_url: https://github.com/Fransou/MolGenDocking
-repo_name: Fransou/MolGenDocking
+repo_url: https://github.com/Fransou/MolRGen
+repo_name: Fransou/MolRGen
 
 theme:
   name: material
